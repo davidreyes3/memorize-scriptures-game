@@ -4,7 +4,6 @@
 export type VerseId = string;
 export type PathId = string;
 export type TextRung = 1 | 2 | 3 | 4 | 5;
-export type RefRung = 1 | 2 | 3;
 
 export interface Verse {
   id: VerseId;
@@ -20,11 +19,9 @@ export interface Path {
 }
 
 export interface VerseProgress {
-  stage: TextRung;
+  stage: TextRung; // the only ladder
   due: number; // epoch ms; 0 = due now
   seen: number; // repeat counter; drives the window shift
-  refStage: RefRung;
-  refDue: number;
   lastAloud: number; // epoch ms; 0 = never
   introducedAt: number | null; // null = not yet in rotation
 }
@@ -45,8 +42,6 @@ export function blankProgress(): VerseProgress {
     stage: 1,
     due: 0,
     seen: 0,
-    refStage: 1,
-    refDue: 0,
     lastAloud: 0,
     introducedAt: null,
   };
@@ -68,7 +63,6 @@ export function createSaveData(verses: readonly Verse[]): SaveData {
 export const FRACTION: readonly number[] = [0, 0, 0.3, 0.6, 1, 1];
 export const DECOYS: readonly number[] = [0, 0, 0, 1, 2, 3];
 export const INTERVALS: readonly number[] = [0, 1, 2, 4, 9, 21];
-export const REF_INTERVALS: readonly number[] = [0, 2, 6, 21];
 export const MAX_WINDOW = 14;
 export const MIN_WINDOW = 3;
 export const SESSION_MS = 300_000;
@@ -76,7 +70,8 @@ export const DAY_MS = 86_400_000;
 export const ALOUD_GAP_MS = 7 * DAY_MS;
 export const DEFAULT_NEW_PER_DAY = 2;
 export const EROSION_MAX_CHARS = 60;
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const TEXT_RUNG_NAMES = ["Lesen", "Satzteil", "Abschnitt", "Aufbau", "Kalt"] as const;
-export const REF_RUNG_NAMES = ["Erkennen", "Zuordnen", "Bilden"] as const;
+// Not rungs — three forms of one ungated address question, picked at random (build.md §4.10).
+export const ADDRESS_QUESTION_FORMS = ["Erkennen", "Zuordnen", "Bilden"] as const;

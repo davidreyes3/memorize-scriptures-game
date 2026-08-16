@@ -11,8 +11,9 @@ export interface QueueItem {
 
 /**
  * Verses with `introducedAt === null` never enter a queue. `force` (the "Trotzdem üben"
- * escape hatch) ignores due dates for text/ref, but `aloud` is never a test — it always
- * follows its own 7-day gate regardless of force.
+ * escape hatch) ignores the due date for text; `ref` has no schedule of its own and
+ * simply rides along whenever text does. `aloud` is never a test — it always follows
+ * its own 7-day gate regardless of force.
  */
 export function assembleQueue(
   pathId: PathId,
@@ -29,14 +30,15 @@ export function assembleQueue(
     const p = save.progress[verse.id];
     if (!p || p.introducedAt == null) continue;
 
-    if (force || p.due <= now) items.push({ kind: "text", id: verse.id });
-    if (p.stage >= 2 && (force || p.refDue <= now)) items.push({ kind: "ref", id: verse.id });
+    const textDue = force || p.due <= now;
+    if (textDue) items.push({ kind: "text", id: verse.id });
+    if (textDue && p.stage >= 2) items.push({ kind: "ref", id: verse.id });
     if (p.stage >= 3 && now - p.lastAloud > ALOUD_GAP_MS) items.push({ kind: "aloud", id: verse.id });
   }
 
   return shuffle(items, rng);
 }
 
-export function isHeld(progress: { stage: number; refStage: number }): boolean {
-  return progress.stage >= 5 && progress.refStage >= 3;
+export function isHeld(progress: { stage: number }): boolean {
+  return progress.stage >= 5;
 }

@@ -1,6 +1,8 @@
-// Grading (docs/build.md §4.5). Rungs floor at 2 (text) and 1 (address) — a miss never
-// sends a verse back to the first rung.
-import { DAY_MS, INTERVALS, REF_INTERVALS, type RefRung, type TextRung, type VerseProgress } from "../game/types";
+// Grading (docs/build.md §4.5). The rung floors at 2 — a miss never sends a verse back
+// to the first rung. The address question rides along ungated (build.md §7.3) and has
+// no grading function of its own: a miss just requeues it, handled by the session
+// controller, not here.
+import { DAY_MS, INTERVALS, type TextRung, type VerseProgress } from "../game/types";
 
 export function gradeText(progress: VerseProgress, ok: boolean, now: number): VerseProgress {
   const seen = progress.seen + 1;
@@ -12,25 +14,12 @@ export function gradeText(progress: VerseProgress, ok: boolean, now: number): Ve
   return { ...progress, seen, stage, due: 0 };
 }
 
-export function gradeRef(progress: VerseProgress, ok: boolean, now: number): VerseProgress {
-  if (ok) {
-    const refStage = Math.min(3, progress.refStage + 1) as RefRung;
-    return { ...progress, refStage, refDue: now + REF_INTERVALS[refStage] * DAY_MS };
-  }
-  const refStage = Math.max(1, progress.refStage - 1) as RefRung;
-  return { ...progress, refStage, refDue: 0 };
-}
-
 /**
- * Look it up: always available, always costs the rung. No rung changes in either
- * direction; `due`/`refDue` reset to 0 so the verse returns the same day.
+ * Look it up: always available, always costs the round. No rung change; `due` resets
+ * to 0 so the verse returns the same day.
  */
 export function markLookedUpText(progress: VerseProgress): VerseProgress {
   return { ...progress, due: 0 };
-}
-
-export function markLookedUpRef(progress: VerseProgress): VerseProgress {
-  return { ...progress, refDue: 0 };
 }
 
 export function markAloud(progress: VerseProgress, now: number): VerseProgress {

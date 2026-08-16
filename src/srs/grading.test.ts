@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { gradeRef, gradeText, markAloud, markLookedUpRef, markLookedUpText } from "./grading";
-import { DAY_MS, INTERVALS, REF_INTERVALS, blankProgress } from "../game/types";
+import { gradeText, markAloud, markLookedUpText } from "./grading";
+import { DAY_MS, INTERVALS, blankProgress } from "../game/types";
 
 const NOW = 1_700_000_000_000;
 
@@ -38,38 +38,12 @@ describe("gradeText", () => {
   });
 });
 
-describe("gradeRef", () => {
-  it("advances one rung on pass with the matching interval", () => {
-    const p = { ...blankProgress(), refStage: 1 as const };
-    const result = gradeRef(p, true, NOW);
-    expect(result.refStage).toBe(2);
-    expect(result.refDue).toBe(NOW + REF_INTERVALS[2] * DAY_MS);
-  });
-
-  it("ceilings at rung 3", () => {
-    const p = { ...blankProgress(), refStage: 3 as const };
-    expect(gradeRef(p, true, NOW).refStage).toBe(3);
-  });
-
-  it("floors at rung 1 on fail", () => {
-    const p = blankProgress();
-    expect(gradeRef(p, false, NOW).refStage).toBe(1);
-  });
-});
-
 describe("look-up marks", () => {
   it("resets due without changing stage", () => {
     const p = { ...blankProgress(), stage: 4 as const, due: NOW + 1000 };
     const result = markLookedUpText(p);
     expect(result.stage).toBe(4);
     expect(result.due).toBe(0);
-  });
-
-  it("resets refDue without changing refStage", () => {
-    const p = { ...blankProgress(), refStage: 2 as const, refDue: NOW + 1000 };
-    const result = markLookedUpRef(p);
-    expect(result.refStage).toBe(2);
-    expect(result.refDue).toBe(0);
   });
 });
 
@@ -79,6 +53,5 @@ describe("markAloud", () => {
     const result = markAloud(p, NOW);
     expect(result.lastAloud).toBe(NOW);
     expect(result.stage).toBe(p.stage);
-    expect(result.refStage).toBe(p.refStage);
   });
 });
