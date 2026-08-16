@@ -3,7 +3,7 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-16.
+Last updated: 2026-08-16 (visual foundation landed).
 
 ---
 
@@ -39,7 +39,13 @@ injected, importing nothing from React:
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
 **130 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen.
-`npm run build` type-checks clean.
+
+**The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
+token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
+override) plus four `--font-*` variables. The four faces (Bevan, Karla, EB Garamond, IBM Plex Mono)
+are self-hosted via `@fontsource/*` packages — Vite bundles their `.woff2`/`.woff` files locally at
+build time, so there's no CDN call at runtime. `App.tsx`'s placeholder now renders through the real
+tokens/fonts as a smoke test (pulling its sample verse from `verses.de.ts`, not hand-typed).
 
 **Copyright screening is automated.** `npm test` fails if any shipped verse carries markers of a
 copyrighted translation, and also screens any Logos export sitting in `docs/` locally — so a bad
@@ -53,19 +59,17 @@ known 1984 wordings, so stripping the tags doesn't get past it.
 
 Roughly in dependency order.
 
-1. **The visual foundation** — CSS custom-property token system from `build.md` §7.1, both themes,
-   and the four self-hosted `.woff2` faces from §7.2. Nothing else can look right until this lands.
-2. **The stepping-stone component** (`build.md` §7.3) — four states, the 5-wedge cracked stone, the
+1. **The stepping-stone component** (`build.md` §7.3) — four states, the 5-wedge cracked stone, the
    two-stage graduation. The single most important new component; build it first and in isolation.
-3. **The session controller** — the stateful layer wiring pure `game/`/`srs/` functions to React:
+2. **The session controller** — the stateful layer wiring pure `game/`/`srs/` functions to React:
    current screen, active queue, round in progress, the invisible five-minute clock and its
    "serve exactly one more item, then stop" rule (§4.11). This is the only genuinely new *logic*
    left; everything else is presentation.
-4. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
+3. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
    variants), Zusammenfassung. Sitzung is by far the biggest.
-5. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
+4. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
    screens get built, so a second locale stays possible.
-6. **`src/components/`** — doesn't exist yet.
+5. **`src/components/`** — doesn't exist yet.
 
 ---
 

@@ -1,0 +1,85 @@
+/* Design tokens — docs/build.md §7.1 and §7.2. Light is the default theme. */
+
+@import "@fontsource/bevan/400.css";
+@import "@fontsource/karla/400.css";
+@import "@fontsource/karla/700.css";
+@import "@fontsource/eb-garamond/400.css";
+@import "@fontsource/eb-garamond/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+:root {
+  --ground: #e7eae0;
+  --surface: #f3f4ec;
+  --surface-line: #d7dbcb;
+  --ink: #262b23;
+  --ink-muted: #6b7364;
+  --stone: #adb39f;
+  --stone-line: #8b9280;
+  --moss: #4f6647;
+  --on-moss: #f1f3ea;
+  --waymark: #c6862f;
+  --on-waymark: #2b2008;
+  --water: #3e7d72;
+  --clay: #a24a34;
+  --trail-ahead: #c4c9b8;
+
+  --font-display: "Bevan", serif;
+  --font-ui: "Karla", sans-serif;
+  --font-scripture: "EB Garamond", serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #1b211a;
+    --surface: #232a20;
+    --surface-line: #35402f;
+    --ink: #e7e9dc;
+    --ink-muted: #9ba38d;
+    --stone: #454f3f;
+    --stone-line: #5b6652;
+    --moss: #7fa06e;
+    --on-moss: #15220f;
+    --waymark: #e3a94f;
+    --on-waymark: #2b1d06;
+    --water: #5fae9e;
+    --clay: #c97456;
+    --trail-ahead: #3a4434;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #1b211a;
+  --surface: #232a20;
+  --surface-line: #35402f;
+  --ink: #e7e9dc;
+  --ink-muted: #9ba38d;
+  --stone: #454f3f;
+  --stone-line: #5b6652;
+  --moss: #7fa06e;
+  --on-moss: #15220f;
+  --waymark: #e3a94f;
+  --on-waymark: #2b1d06;
+  --water: #5fae9e;
+  --clay: #c97456;
+  --trail-ahead: #3a4434;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
