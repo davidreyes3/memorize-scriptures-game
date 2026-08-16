@@ -42,9 +42,13 @@ exceptions left now that Deploy is cut.
 **The five minutes are real, and invisible.** Never add anything that quietly extends a session —
 and never show a countdown, draining bar, or "last one" warning. The cap is felt, not displayed.
 
-**Never merge the two ladders.** `stage` (words) and `refStage` (address) stay independent in the
-data model so each paces itself. Only the *display* collapses them into one stone. This was
-considered carefully and rejected — reasoning in `build.md` §7.3.
+**The address question never gates the stone.** `stage` (`build.md` §3) is the only ladder — the
+address prompt (book, chapter, verse) rides along with text review as an ungated question with no
+schedule of its own. A miss just re-asks it later in the same session; it never changes `stage` or
+delays a stone's progression. This replaced an earlier two-ladder model (`refStage`/`refDue`) that
+gated a second "gold" graduation on the address answer — reasoning for both the original split and
+the later cut is in `build.md` §7.3. Don't reintroduce a second scheduled field for the address
+question without treating that as a deliberate new decision, not a reversion.
 
 **Gold is only for mastery.** `--waymark` marks fully-held verses and the primary action, nothing
 else. Spend it elsewhere and the mastery moment stops meaning anything.
@@ -65,7 +69,7 @@ dependency** (see Hard rules) — and when one is approved, add its row here in 
 |---|---|
 | `react`, `react-dom` | The UI is a small state machine over screens; components keep that legible. |
 | `vite` | Instant dev server, no config to learn. Also the production bundler — it's what fingerprints and locally emits the self-hosted fonts below, so there's no CDN call at runtime. |
-| `typescript` | The rung ladders (`stage`/`refStage`) are the kind of thing types catch mistakes in early. |
+| `typescript` | The rung ladder (`stage`) is the kind of thing types catch mistakes in early. |
 | `vitest` | Pure logic is where the bugs would hide, so it gets real tests. |
 | `@vitejs/plugin-react` | Vite's official plugin for JSX transform and Fast Refresh. |
 | `@types/react`, `@types/react-dom` | Type declarations for React/ReactDOM — neither ships its own. |

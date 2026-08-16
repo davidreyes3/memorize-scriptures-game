@@ -27,6 +27,7 @@
 > | §4 | "The clock is real and visible... shown as a countdown and a draining bar" | **Reversed. The timer is fully invisible** — no countdown, no draining bar, no numeric badge anywhere. The five-minute cap is an ambient background constraint; see `build.md` §4.11 |
 > | §9 | dark, printerly, restrained; ink/vellum/gold | **Reversed. Redesigned as a pilgrimage trail** — verses as stepping stones that crack into five pieces and heal as you master them; moss/stone/brass palette, daylight not manuscript. Full palette, type and component spec in [`build.md`](build.md) §7 |
 > | §8 | erosion strip as the progress display | Superseded on the path screens by the stepping stone (`build.md` §7.3) and the 3-dot mini-trail (§6). `game/erosion.ts` exists and is tested but may now be unused — see `build.md` §11 |
+> | §3 | "A verse counts as held only when both tracks are full" | **Reversed.** The address track is no longer a scored ladder — it's one ungated question (Recognise/Match/Build, picked at random) that rides along whenever text review is due. A miss just re-asks it later in the session; it never advances or costs a rung, and `held` means the word ladder alone reaching rung 5. Full reasoning in `build.md` §7.3 |
 >
 > Architecture is now React + Vite + TypeScript + Vitest, persisting to `localStorage`.
 > The prototype remains the behavioural reference — see `build.md` for the four places its

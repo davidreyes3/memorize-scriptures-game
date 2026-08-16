@@ -12,9 +12,10 @@ Status: no application code exists yet. Everything below is the target.
 ## 1. Product in one paragraph
 
 A verse memorization app for a German-speaking, UCG-doctrine-aligned audience. Each verse is
-learned on **two independent ladders** — the words, and the address (book, chapter, verse).
-Exercises are **generated from the verse text itself**, never authored per verse. A session is
-**five minutes**, on a real visible clock. Everything runs locally in the browser, offline.
+learned on a **five-rung word ladder**, with an address question (book, chapter, verse) riding
+along as ungated practice. Exercises are **generated from the verse text itself**, never authored
+per verse. A session is **five minutes**, with the cap kept fully invisible (§4.11). Everything
+runs locally in the browser, offline.
 
 Two constraints govern every decision:
 
@@ -43,6 +44,7 @@ Two constraints govern every decision:
 | Persistence | `localStorage` only | new |
 | Visual identity | **Reversed.** A pilgrimage trail — verses as stepping stones, moss/stone/brass, daylight — replaces spec §9's dark manuscript look. See §7 | §9 (reverses) |
 | Session timer | **Reversed. Fully invisible** — no countdown, no draining bar, anywhere | §4 (reverses) |
+| Address track | **Cut as a second ladder.** No `refStage`/`refDue`/gold-gating — it's one ungated question riding along with text review (§4.5, §4.10, §7.3) | §3 (reverses); also reverses an earlier `build.md` §7.3 pass |
 
 Cutting Deploy removes what §6 calls *"the point of the whole module"* — a deliberate call.
 The upside: **zero-authoring is now absolute.** No hand-written content remains anywhere in the app.
@@ -55,7 +57,6 @@ The upside: **zero-authoring is now absolute.** No hand-written content remains 
 type VerseId  = string;
 type PathId   = string;
 type TextRung = 1 | 2 | 3 | 4 | 5;
-type RefRung  = 1 | 2 | 3;
 
 interface Verse {
   id:   VerseId;
@@ -71,11 +72,9 @@ interface Path {
 }
 
 interface VerseProgress {
-  stage:        TextRung;       // text ladder
+  stage:        TextRung;       // the only ladder
   due:          number;         // epoch ms; 0 = due now
   seen:         number;         // repeat counter; drives the window shift
-  refStage:     RefRung;        // address ladder
-  refDue:       number;
   lastAloud:    number;         // epoch ms; 0 = never
   introducedAt: number | null;  // null = not yet in rotation
 }
@@ -92,7 +91,12 @@ interface Settings {
 }
 ```
 
-New verses start `{ stage:1, due:0, seen:0, refStage:1, refDue:0, lastAloud:0, introducedAt:null }`.
+New verses start `{ stage:1, due:0, seen:0, lastAloud:0, introducedAt:null }`.
+
+> ⚠️ **Deviation from an earlier pass.** `VerseProgress` used to carry `refStage`/`refDue` — a
+> second 3-rung ladder for the address (book, chapter, verse) that gated its own "gold" graduation.
+> Cut: see the design decision in §7.3. The address question still exists (§4.5, §4.10) — it just
+> no longer owns any scheduled state.
 
 ### Constants
 
@@ -101,17 +105,17 @@ New verses start `{ stage:1, due:0, seen:0, refStage:1, refDue:0, lastAloud:0, i
 | `FRACTION` | `[0, 0, .3, .6, 1, 1]` | share of the verse hidden, indexed by text rung |
 | `DECOYS` | `[0, 0, 0, 1, 2, 3]` | spare words in the bank, by text rung |
 | `INTERVALS` | `[0, 1, 2, 4, 9, 21]` | days until next review, by rung reached |
-| `REF_INTERVALS` | `[0, 2, 6, 21]` | same, address ladder |
 | `MAX_WINDOW` | `14` | most words hidden at once — **now applies at rung 5 too** |
 | `MIN_WINDOW` | `3` | fewest, unless the verse is shorter |
 | `SESSION_MS` | `300_000` | five minutes |
 | `ALOUD_GAP_MS` | `7 * 86_400_000` | how often a held verse is read aloud again |
 | `DEFAULT_NEW_PER_DAY` | `2` | verses introduced per day, **across all paths**. Seeds `settings.newPerDay`, which the user can change |
 | `EROSION_MAX_CHARS` | `60` | how much of a verse the erosion strip shows before truncating |
-| `SCHEMA_VERSION` | `1` | bump on any `SaveData` shape change |
+| `SCHEMA_VERSION` | `2` | bump on any `SaveData` shape change |
 
 Rung names: `["Lesen","Satzteil","Abschnitt","Aufbau","Kalt"]`.
-Address rung names: `["Erkennen","Zuordnen","Bilden"]`.
+Address question forms: `["Erkennen","Zuordnen","Bilden"]` — not rungs, just three shapes of the
+same ungated question, picked at random each time one rides along (§4.10).
 
 ---
 
@@ -197,22 +201,29 @@ Same register as the target, plausible, and free — no authoring. Returns `[]` 
 
 ```ts
 gradeText(p: VerseProgress, ok: boolean, now: number): VerseProgress
-gradeRef (p: VerseProgress, ok: boolean, now: number): VerseProgress
 ```
 
 | | pass | fail |
 |---|---|---|
 | Text | `stage = min(5, stage+1)`, `due = now + INTERVALS[stage]·day` | `stage = max(2, stage-1)`, `due = 0`, requeued this session |
-| Address | `refStage = min(3, refStage+1)`, `refDue = now + REF_INTERVALS[refStage]·day` | `refStage = max(1, refStage-1)`, `refDue = 0` |
 
-`seen` increments on every graded text round, pass or fail. Rungs floor at 2 and 1 — a miss never
+`seen` increments on every graded text round, pass or fail. The rung floors at 2 — a miss never
 sends a verse back to *Lesen*.
 
-**Pass criteria:** fill rounds (2–4) require an exact word-for-word match. *Kalt* (5) and address
-*Bilden* (3) pass at **`slips <= 1`**.
+**The address question (Erkennen/Zuordnen/Bilden, picked at random) carries no rung of its own.**
+It rides along with text review (§4.10) as a single ungated prompt. A pass records nothing beyond
+the session's tally; a fail just requeues the same question later in the same session, exactly like
+a missed text round. It never touches `stage`, and there is no `refStage`/`refDue` to update.
 
-**Look it up** — always available, always costs the rung. When used: no rung changes in either
-direction, `due = 0` so the verse returns the same day, and the round is not requeued.
+> **Deviation from an earlier pass.** The address track used to be its own 3-rung ladder
+> (`refStage`/`refDue`/`REF_INTERVALS`, graded by a `gradeRef`) that gated a second "gold"
+> graduation. Cut — full reasoning for both the original split and the later cut is in §7.3.
+
+**Pass criteria:** fill rounds (2–4) require an exact word-for-word match. *Kalt* (5) and address
+*Bilden* pass at **`slips <= 1`**.
+
+**Look it up** — always available, always costs the round: no verdict is recorded, `stage` is
+unchanged, and (for text) `due = 0` so the verse returns the same day. The round is not requeued.
 
 ### 4.6 The Cold rung and long verses
 
@@ -313,11 +324,12 @@ For each **introduced** verse in the path:
 | Kind | Condition |
 |---|---|
 | `text` | `due <= now` |
-| `ref` | `stage >= 2` **and** `refDue <= now` |
+| `ref` | `due <= now` **and** `stage >= 2` — rides the text review; no schedule of its own |
 | `aloud` | `stage >= 3` **and** `now - lastAloud > ALOUD_GAP_MS` |
 
 Shuffle the result. `aloud` is **not a test** — it shows the verse, asks the user to say it, resets
-the timer on "Gesagt", and grades nothing. It never gates progression (§10.4).
+the timer on "Gesagt", and grades nothing. It never gates progression (§10.4). `ref` **is** graded
+(right/wrong feeds the verdict block) but never gates progression either — see §4.5.
 
 A **"Trotzdem üben"** escape hatch assembles a queue ignoring due dates when nothing is due.
 
@@ -346,7 +358,7 @@ rolls to tomorrow.
 src/
   game/        tokenize, bare, buildRound, decoysFor, skeleton, erosionStrip,
                parseRef, formatRef, hashSeed, mulberry32, shuffle
-  srs/         gradeText, gradeRef, introduceNewVerses, assembleQueue,
+  srs/         gradeText, introduceNewVerses, assembleQueue,
                isHeld, dueLabel
   storage/     load(), save(), reset()  — localStorage, key "engrave.save"
   data/        verses.de.ts, paths.de.ts, books.de.ts
@@ -408,12 +420,13 @@ invisible. Seven bodies:
 | Text 1 · Lesen | full verse, "Ich habe es laut gelesen". Not graded |
 | Text 2–4 | cloze with gaps + tile bank; *Prüfen* enabled once every gap is filled; *Rückgängig* |
 | Text 5 · Kalt | windowed first-letter skeleton + bank, tapped in order; wrong tile flashes and counts a slip |
-| Address 1 · Erkennen | verse shown, pick the reference from 4 |
-| Address 2 · Zuordnen | reference shown, pick the text from 4 |
-| Address 3 · Bilden | build book → chapter → verse from tiles |
+| Address · Erkennen | verse shown, pick the reference from 4 |
+| Address · Zuordnen | reference shown, pick the text from 4 |
+| Address · Bilden | build book → chapter → verse from tiles |
 | Aloud | verse shown, "Gesagt". Not graded |
 
-After grading: a verdict block, then *Weiter* (or *Fertig*).
+The three address forms aren't a sequence — one is picked at random each time a `ref` item rides a
+due text review (§4.10). After grading: a verdict block, then *Weiter* (or *Fertig*).
 
 **Zusammenfassung (summary)** — time, questions answered, first-time correct, rungs climbed, total held.
 
@@ -482,14 +495,13 @@ The most important new component; every path screen needs it. One irregular blob
 border-radius: 61% 39% 52% 48% / 46% 40% 60% 54%;
 ```
 
-**Four states, driven by the two ladders in §3:**
+**Three states, driven by `stage` (§3) alone:**
 
 | State | Look | Condition |
 |---|---|---|
 | **Locked** | 76px dotted `--stone-line` outline, `opacity: .6`, `?` mark, no fill | `introducedAt === null` |
-| **Cracked** | 76px, fractured into **5 wedges**; each wedge is `--stone` until its text rung passes, then `--moss` | introduced, `stage < 5` |
-| **Mastered** | 72px **solid `--moss`**, whole, no mark | `stage === 5`, `refStage < 3` |
-| **Held** | 72px **solid `--waymark`**, whole, `✓` mark | `isHeld` — both ladders full |
+| **Cracked** | 76px, fractured into **5 wedges**; each wedge is `--stone` until its rung passes, then `--moss` | introduced, `stage < 5` |
+| **Held** | 72px **solid `--waymark`**, whole, `✓` mark | `stage === 5` |
 
 The cracked stone renders as **one element, not five**: a `conic-gradient` of five 72°-wedges whose
 colors come from five custom properties (`--p1`…`--p5`), over a `repeating-conic-gradient` hairline
@@ -497,22 +509,26 @@ that draws the seams, plus the same `box-shadow` a solid stone uses so it reads 
 fractured and dimensional rather than a flat pie chart. No per-piece DOM node, no hand-placed
 coordinates — set `--p1..--p5` from `stage` and the shape follows.
 
-**Address progress is invisible.** The five pieces track the **text ladder only**. Nothing on screen
-reveals whether a verse is one or three address-rungs from gold.
+**The address question never touches the stone.** It rides along with text review (§4.10) as a
+single ungated prompt — Erkennen, Zuordnen, or Bilden, picked at random — and a miss just requeues
+it later in the same session. It has no rung, no schedule of its own, and no visible effect on
+progression; the stone tracks the word ladder alone.
 
-> **Design decision — the two ladders were nearly merged, and deliberately weren't.** Showing 5
-> text pips *and* 3 nested address pips was built and rejected as too complex. The considered
-> alternative was collapsing `stage` + `refStage` into a single 5-rung ladder where each rung tests
-> words and address together. That was rejected too: word-recall and address-recall are genuinely
-> different memory tasks that need to advance at their own rates — someone who knows the wording
-> cold but keeps blanking on the book would be forced to re-drill mastered word exercises just to
-> get more attempts at the address. **The data model keeps both ladders independent (§3); only the
-> display collapses to one shape.** Do not "simplify" `VerseProgress` by merging them.
+> **Design decision — the address track used to be a second ladder, and no longer is.** An earlier
+> pass gave book/chapter/verse its own 3-rung ladder (`refStage`) that gated a second "gold"
+> graduation on top of "moss" for mastered words. Before that, a fully-merged single ladder was
+> also considered and rejected: word-recall and address-recall are genuinely different memory
+> tasks, and forcing a shared rung would make someone who knows the wording cold re-drill mastered
+> word exercises just for another shot at the address. The two-ladder compromise was itself cut
+> later: gating mastery on the address answer meant a forgotten book name could hold a verse just
+> short of gold indefinitely, which isn't what stone progression should hinge on. The address
+> question is now asked for its own sake — real retrieval practice — without owning any part of
+> the reward. **Do not reintroduce a second scheduled field for it** (`refStage`/`refDue`); if it
+> ever needs one, that's a deliberate new decision, not a reversion to this one.
 
-**Graduation is two quiet moments, not one.** All five pieces healed → the stone goes whole and
-**moss** (words mastered). Later, when the address ladder finishes, it shifts **moss → gold** and
-gains its mark. Both transitions cross-fade with a slight scale; the gold one adds a brief glow.
-Honour `prefers-reduced-motion` — under it, swap states with no scale or glow.
+**Graduation is one quiet moment.** All five pieces healed → the stone goes whole and **gold**,
+gaining its mark. The transition cross-fades with a slight scale and a brief glow. Honour
+`prefers-reduced-motion` — under it, swap states with no scale or glow.
 
 ### 7.4 Layout
 
@@ -583,9 +599,8 @@ rung 5**; a 31-word verse at rung 5 yields exactly 14; indices contiguous and in
 characters; returns exactly `DECOYS[stage]` when the pool allows; **returns fewer without throwing
 when the path holds one verse**; returns `[]` for `n = 0`.
 
-**`gradeText` / `gradeRef`** — advances one rung; floors at 2 and 1; ceilings at 5 and 3; due dates
-match the interval tables; `seen` increments on pass and on fail; a looked-up round moves no rung
-and sets `due = 0`.
+**`gradeText`** — advances one rung; floors at 2; ceilings at 5; due dates match the interval
+table; `seen` increments on pass and on fail; a looked-up round moves no rung and sets `due = 0`.
 
 **`introduceNewVerses`** — introduces at most `settings.newPerDay`; a second call the same day
 introduces none; the next calendar day introduces the full quota again; stamps `introducedAt`;
@@ -597,9 +612,9 @@ introduces none rather than throwing or un-introducing anything.**
 three words even when they are long compounds; a short verse shows in full with no ellipsis;
 the full/first-letter split follows the rung fractions.
 
-**`assembleQueue`** — excludes verses with `introducedAt === null`; `ref` only at `stage >= 2`;
-`aloud` only at `stage >= 3` and after 7 days; a verse can yield up to three items at once; the
-force flag ignores due dates.
+**`assembleQueue`** — excludes verses with `introducedAt === null`; `ref` only alongside a due text
+item and only at `stage >= 2`; `aloud` only at `stage >= 3` and after 7 days; a verse can yield up
+to three items at once; the force flag ignores due dates.
 
 **`parseRef`** — `1. Mose 1,1`, `Johannes 3,16`, `1. Korinther 15,52`; throws on `Genesis 1:1`
 (colon), on missing verse, and on empty input. `formatRef(parseRef(x)) === x` for all book names.
@@ -617,6 +632,8 @@ force flag ignores due dates.
 - A session ends within one item of the five-minute mark, never mid-question, and with no visible
   countdown, draining bar, or "last one" warning anywhere in the session UI (§4.11).
 - A missed verse returns later in the same session; a passed verse does not.
+- A missed address question returns later in the same session, exactly like a missed text round —
+  and, right or wrong, it never changes `stage` or a stone's progression.
 - **Nachschlagen** visibly prevents advancement, and the verse returns the same day.
 - Progress survives a page reload, and a fresh profile introduces exactly 2 verses on day one.
 - Every control is reachable and tappable at 375 px wide.
@@ -632,7 +649,8 @@ Nothing blocking. One item deliberately deferred:
 - **The retrieval gap left by cutting Deploy.** `spec.md` §6 called it *"the point of the whole
   module"* — the only exercise testing whether a verse arrives when a real question prompts it,
   rather than when the verse itself is the prompt. Deferred on purpose: use the app first, and
-  decide from experience whether the two ladders alone actually produce recall in conversation.
+  decide from experience whether the word ladder plus the ungated address question actually
+  produce recall in conversation.
   If they don't, the replacement should be **derived, not authored** — for example, showing one
   verse from a path and asking which *other* verse in that path speaks to the same question.
   Weaker than a real objection, but it keeps zero-authoring absolute.
