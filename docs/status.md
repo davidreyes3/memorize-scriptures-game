@@ -64,8 +64,11 @@ Roughly in dependency order.
 
 ## Loose ends and risks
 
-- **⚠️ No git repository.** This project has no version control at all. Substantial work now exists
-  with no history and no way to undo a bad change. Worth fixing before the UI work starts.
+- **No GitHub remote configured yet.** The repo is local-only, so there's still no offsite backup.
+  A GitHub repository exists but its URL hasn't been wired up, and **its public/private status is
+  unconfirmed** — worth checking before the first push, since that decides whether an accidental
+  copyrighted-verse commit would be a public distribution. Commit identity is set repo-locally to
+  a GitHub noreply address, so the real email stays out of history either way.
 - **`game/erosion.ts` may be dead code.** It implements `spec.md` §8's word-decaying strip, is
   fully tested, but the trail redesign gave its Pfade-card job to the 3-dot mini-trail, and stone
   plaques use a plain quote snippet instead. Decide whether it has a home (a single-stone detail
@@ -82,12 +85,16 @@ Roughly in dependency order.
 
 ## Environment notes
 
-- **Node.js 26.7.0 is installed at `C:\Program Files\nodejs`, but is not on the shell PATH.**
-  Every command that needs it must prefix:
+- **Neither Node nor git is on the shell PATH**, though both are installed — Node 26.7.0 at
+  `C:\Program Files\nodejs`, git 2.55 at `C:\Program Files\Git\cmd`. Every command needs:
   ```powershell
-  $env:Path += ";C:\Program Files\nodejs"
+  $env:Path += ";C:\Program Files\nodejs;C:\Program Files\Git\cmd"
   ```
   This does not persist between tool calls — re-add it each time.
+- **Git identity is set repo-locally, not globally** (`git config user.name` / `user.email` inside
+  this repo). Other projects on this machine are unaffected and still have no global identity.
+- The commit convention — message format, when to commit, and the mandatory scripture-licensing
+  check before staging verse data — is documented in `CLAUDE.md` under *Committing*.
 - `npm audit` reports vulnerabilities in the **dev-only** Vite/esbuild toolchain (a dev-server
   CORS issue). Not a runtime risk for an offline app with no backend; fixing means a major Vite
   version bump. Deliberately left alone.
