@@ -39,6 +39,8 @@ injected, importing nothing from React:
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
 **130 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen.
+`npm run build` type-checks clean (`@types/node` added as a dev dependency to fix `licensing.test.ts`'s
+use of `node:fs`/`node:path`, which `tsc` couldn't resolve without it).
 
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
