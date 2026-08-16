@@ -1,0 +1,9 @@
+# Normalise line endings: LF in the repository, native in the working copy.
+# Without this, every file on Windows shows up as modified purely from CRLF churn.
+* text=auto eol=lf
+
+# Binary assets — never touch these.
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.ico binary

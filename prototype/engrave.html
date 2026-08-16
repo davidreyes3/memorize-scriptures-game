@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Engrave — memorization module</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#14121F; --ink-raised:#1E1B2E; --ink-line:#2C2841;
+  --vellum:#EDE6D8; --vellum-dim:#9B94A8;
+  --gold:#C8A54B; --gold-dim:#7A6530;
+  --verdigris:#6E9C8A; --rust:#B4573F; --slate:#7C7B99;
+  --serif:"EB Garamond",Georgia,serif;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--ink);color:var(--vellum);font-family:var(--sans);font-size:16px;
+  line-height:1.5;min-height:100vh;padding:0 0 env(safe-area-inset-bottom)}
+#app{max-width:520px;margin:0 auto;padding:20px 18px 40px}
+
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--slate);margin:0 0 6px}
+h1{font-family:var(--serif);font-size:34px;font-weight:500;margin:0 0 4px}
+h2{font-family:var(--serif);font-size:25px;font-weight:500;margin:0 0 4px}
+.sub{color:var(--vellum-dim);font-size:14px;margin:0 0 26px}
+.scripture{font-family:var(--serif);font-size:22px;line-height:1.55;color:var(--vellum)}
+.ref{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--gold);text-transform:uppercase}
+
+.masthead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;
+  padding-bottom:14px;border-bottom:1px solid var(--ink-line)}
+.wordmark{font-family:var(--serif);font-size:19px}
+.wordmark span{color:var(--gold)}
+.held-tally{font-family:var(--mono);font-size:11px;color:var(--slate);letter-spacing:.08em}
+.held-tally b{color:var(--gold);font-weight:500}
+
+.path{display:block;width:100%;text-align:left;background:var(--ink-raised);
+  border:1px solid var(--ink-line);border-radius:3px;padding:18px;margin-bottom:12px;
+  cursor:pointer;color:inherit;font:inherit;transition:border-color .18s ease,transform .18s ease}
+.path:hover,.path:focus-visible{border-color:var(--gold-dim);transform:translateY(-1px)}
+.path-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.path-name{font-family:var(--serif);font-size:21px}
+.path-count{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap}
+.path-blurb{font-size:13.5px;color:var(--vellum-dim);margin-top:5px}
+.path-due{font-family:var(--mono);font-size:11px;color:var(--gold);margin-top:9px;letter-spacing:.06em}
+.path-due.none{color:var(--slate)}
+
+.erosion{font-family:var(--mono);font-size:13px;letter-spacing:.06em;margin-top:11px;
+  color:var(--vellum-dim);word-spacing:.18em;line-height:1.4}
+.erosion .gone{color:var(--gold-dim);opacity:.5}
+
+.vrow{border-top:1px solid var(--ink-line);padding:14px 0}
+.vrow:last-of-type{border-bottom:1px solid var(--ink-line)}
+.vrow-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tracks{display:flex;gap:10px;flex-shrink:0;align-items:center}
+.rungs{display:flex;gap:4px}
+.rung{width:13px;height:3px;background:var(--ink-line);border-radius:1px}
+.rung.on{background:var(--gold)}
+.rung.ref{width:9px}
+.rung.ref.on{background:var(--verdigris)}
+.vrow-state{font-family:var(--mono);font-size:10.5px;color:var(--slate);letter-spacing:.07em;margin-top:7px}
+
+.btn{display:block;width:100%;padding:15px;border-radius:3px;border:1px solid var(--gold);
+  background:var(--gold);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:600;
+  cursor:pointer;margin-top:22px}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.ghost{background:transparent;color:var(--vellum-dim);border-color:var(--ink-line);font-weight:500}
+.btn.ghost:hover{border-color:var(--slate);color:var(--vellum)}
+.btn.sm{padding:11px;font-size:13.5px;margin-top:10px}
+.back{background:none;border:0;color:var(--slate);font-family:var(--mono);font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;padding:0;cursor:pointer}
+.back:hover{color:var(--vellum)}
+
+/* session chrome */
+.sesstop{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.clock{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--slate)}
+.clock.last{color:var(--gold)}
+.timebar{height:2px;background:var(--ink-line);margin-bottom:18px}
+.timebar i{display:block;height:2px;background:var(--gold-dim);transition:width 1s linear}
+.timebar.last i{background:var(--gold)}
+
+.stage-bar{display:flex;gap:5px;margin-bottom:14px}
+.stage-seg{flex:1;height:2px;background:var(--ink-line)}
+.stage-seg.done{background:var(--gold-dim)}
+.stage-seg.now{background:var(--gold)}
+.stage-label{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--slate);margin-bottom:8px;display:flex;justify-content:space-between;gap:10px}
+.stage-label b{color:var(--gold);font-weight:500}
+.stage-label .kindref{color:var(--verdigris)}
+.lookup{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--slate);text-decoration:none;border:1px solid var(--ink-line);
+  border-radius:2px;padding:5px 9px;margin-bottom:18px;cursor:pointer;background:none}
+.lookup:hover{color:var(--vellum);border-color:var(--slate)}
+.lookup.used{color:var(--rust);border-color:var(--rust)}
+.reveal{border-left:2px solid var(--rust);background:rgba(180,87,63,.07);
+  border-radius:0 3px 3px 0;padding:14px 16px;margin:0 0 18px}
+.reveal .ref{display:block;margin-bottom:6px}
+.reveal p{margin:0;font-family:var(--serif);font-size:19px;line-height:1.5;color:var(--vellum)}
+.prompt{font-size:14.5px;color:var(--vellum-dim);margin-bottom:16px}
+
+.cloze{font-family:var(--serif);font-size:21px;line-height:2.1;margin-bottom:20px;
+  background:var(--ink-raised);border:1px solid var(--ink-line);border-radius:3px;padding:16px}
+.gap{display:inline-block;min-width:54px;border-bottom:2px solid var(--gold-dim);margin:0 2px;text-align:center}
+.gap.next{border-bottom-color:var(--gold)}
+.gap.ok{border-bottom-color:var(--verdigris);color:var(--verdigris)}
+.gap.bad{border-bottom-color:var(--rust);color:var(--rust)}
+.gap .truth{display:block;font-size:14px;color:var(--gold);line-height:1.2}
+
+.bank{display:flex;flex-wrap:wrap;gap:7px}
+.tile{font-family:var(--serif);font-size:17px;padding:8px 13px;border-radius:3px;
+  border:1px solid var(--ink-line);background:var(--ink-raised);color:var(--vellum);cursor:pointer}
+.tile.num{font-family:var(--mono);font-size:15px;min-width:46px}
+.tile:hover{border-color:var(--slate)}
+.tile.used{opacity:.18;pointer-events:none}
+.tile.reject{border-color:var(--rust);color:var(--rust)}
+
+.skeleton{font-family:var(--mono);font-size:15px;letter-spacing:.12em;line-height:2.2;
+  color:var(--slate);word-spacing:.3em;margin-bottom:20px;
+  background:var(--ink-raised);border:1px solid var(--ink-line);border-radius:3px;padding:16px}
+.skeleton .filled{color:var(--vellum);font-family:var(--serif);font-size:19px;letter-spacing:0}
+.skeleton .cursor{color:var(--gold);border-bottom:2px solid var(--gold)}
+
+.refslot{font-family:var(--mono);font-size:22px;letter-spacing:.05em;text-align:center;
+  background:var(--ink-raised);border:1px solid var(--ink-line);border-radius:3px;
+  padding:20px 12px;margin-bottom:18px;color:var(--gold)}
+.refslot .empty{color:var(--ink-line)}
+
+.choice{display:block;width:100%;text-align:left;background:var(--ink-raised);
+  border:1px solid var(--ink-line);border-radius:3px;padding:14px 15px;margin-bottom:9px;
+  cursor:pointer;font-family:var(--serif);font-size:17px;line-height:1.45;color:var(--vellum)}
+.choice.mono{font-family:var(--mono);font-size:15px;letter-spacing:.05em}
+.choice:hover:not(:disabled){border-color:var(--slate)}
+.choice:disabled{cursor:default}
+.choice.right{border-color:var(--verdigris);background:rgba(110,156,138,.11)}
+.choice.wrong{border-color:var(--rust);background:rgba(180,87,63,.09)}
+
+.verdict{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  margin-top:18px;padding-top:14px;border-top:1px solid var(--ink-line)}
+.verdict.good{color:var(--verdigris)}
+.verdict.bad{color:var(--rust)}
+.verdict .detail{display:block;font-family:var(--sans);font-size:13px;letter-spacing:0;
+  text-transform:none;color:var(--vellum-dim);margin-top:6px;line-height:1.45}
+
+.stat{display:flex;justify-content:space-between;padding:13px 0;
+  border-bottom:1px solid var(--ink-line);font-size:14px}
+.stat b{font-family:var(--mono);font-weight:500;color:var(--gold)}
+.note{font-size:12.5px;color:var(--slate);line-height:1.55;margin-top:24px;
+  padding-top:16px;border-top:1px solid var(--ink-line)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ============================================================
+   CONTENT — reference + text. That is the whole content file.
+   KJV, public domain.
+   ============================================================ */
+const VERSES=[
+{id:"gen1_1", path:"foundation", ref:"Genesis 1:1",
+ text:"In the beginning God created the heaven and the earth."},
+{id:"john1_1", path:"foundation", ref:"John 1:1",
+ text:"In the beginning was the Word, and the Word was with God, and the Word was God."},
+{id:"rom6_23", path:"foundation", ref:"Romans 6:23",
+ text:"For the wages of sin is death; but the gift of God is eternal life through Jesus Christ our Lord."},
+{id:"tim3_16", path:"foundation", ref:"2 Timothy 3:16",
+ text:"All scripture is given by inspiration of God, and is profitable for doctrine, for reproof, for correction, for instruction in righteousness:"},
+
+{id:"gen2_3", path:"sabbath", ref:"Genesis 2:3",
+ text:"And God blessed the seventh day, and sanctified it: because that in it he had rested from all his work which God created and made."},
+{id:"ex20_8", path:"sabbath", ref:"Exodus 20:8",
+ text:"Remember the sabbath day, to keep it holy."},
+{id:"mark2_27", path:"sabbath", ref:"Mark 2:27",
+ text:"And he said unto them, The sabbath was made for man, and not man for the sabbath:"},
+{id:"heb4_9", path:"sabbath", ref:"Hebrews 4:9",
+ text:"There remaineth therefore a rest to the people of God."},
+
+{id:"ecc9_5", path:"death", ref:"Ecclesiastes 9:5",
+ text:"For the living know that they shall die: but the dead know not any thing, neither have they any reward; for the memory of them is forgotten."},
+{id:"ecc12_7", path:"death", ref:"Ecclesiastes 12:7",
+ text:"Then shall the dust return to the earth as it was: and the spirit shall return unto God who gave it."},
+{id:"cor15_52", path:"death", ref:"1 Corinthians 15:52",
+ text:"In a moment, in the twinkling of an eye, at the last trump: for the trumpet shall sound, and the dead shall be raised incorruptible, and we shall be changed."}
+];
+
+const PATHS=[
+ {id:"foundation", name:"Foundation", blurb:"The four verses everything else gets argued from."},
+ {id:"sabbath",    name:"The Sabbath", blurb:"Creation ordinance through to the epistles, in order."},
+ {id:"death",      name:"What happens at death", blurb:"The texts to have ready when it actually comes up."}
+];
+
+const DEPLOY={
+ foundation:[{q:"Someone asks where doctrine is supposed to come from in the first place. Which verse answers it most directly?",a:"tim3_16"},
+             {q:"A friend says death is simply the natural end and nothing follows. Which verse names both the wage and the gift?",a:"rom6_23"}],
+ sabbath:[{q:"A friend says the Sabbath was given only to Israel at Sinai. Which verse pushes the question back before Sinai?",a:"gen2_3"},
+          {q:"Someone calls Sabbath-keeping a burden invented to control people. Which verse reframes who it was made for?",a:"mark2_27"}],
+ death:[{q:"At a funeral, someone says the departed is watching over the family right now. Which verse would you turn to first?",a:"ecc9_5"},
+        {q:"Someone asks when the dead are raised. Which verse gives the timing?",a:"cor15_52"}]
+};
+
+/* Extra book names for the reference-building bank. One line, never revisited. */
+const BOOKS=["Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Psalms","Proverbs",
+ "Ecclesiastes","Isaiah","Jeremiah","Ezekiel","Daniel","Hosea","Malachi","Matthew","Mark","Luke",
+ "John","Acts","Romans","1 Corinthians","2 Corinthians","Galatians","Ephesians","Philippians",
+ "Colossians","1 Thessalonians","1 Timothy","2 Timothy","Titus","Hebrews","James","1 Peter",
+ "1 John","Jude","Revelation"];
+
+const STAGES=["Read","Phrase","Passage","Rebuild","Cold"];
+const REFSTAGES=["Recognise","Match","Build"];
+const FRACTION=[0,0,.3,.6,1,1];
+const DECOYS  =[0,0,0,1,2,3];
+const INTERVALS=[0,1,2,4,9,21];
+const REFINTERVALS=[0,2,6,21];
+const MAXGAP=14;
+const DAY=864e5;
+const SESSION_MS=5*60*1000;   // the promise
+const ALOUD_GAP=7*DAY;        // how often a held verse gets read aloud again
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let progress={}, view={screen:"paths",path:null}, session=null, round=null, ticker=null;
+const blank=()=>Object.fromEntries(VERSES.map(v=>[v.id,
+  {stage:1,due:0,seen:0,refStage:1,refDue:0,lastAloud:0}]));
+
+async function load(){
+  progress=blank();
+  try{const r=await window.storage.get("engrave-progress");
+    if(r&&r.value){const s=JSON.parse(r.value);
+      Object.keys(progress).forEach(k=>{if(s[k])progress[k]=Object.assign(progress[k],s[k])})}
+  }catch(e){}
+  render();
+}
+async function save(){try{await window.storage.set("engrave-progress",JSON.stringify(progress))}catch(e){}}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const words=t=>t.trim().split(/\s+/);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const verse=id=>VERSES.find(v=>v.id===id);
+const inPath=p=>VERSES.filter(v=>v.path===p);
+const held=()=>VERSES.filter(v=>progress[v.id].stage>=5&&progress[v.id].refStage>=3).length;
+const bare=w=>w.replace(/[^A-Za-z']/g,"");
+const parseRef=r=>{const m=r.match(/^(.+)\s+(\d+):(\d+)$/);return{book:m[1],ch:+m[2],vs:+m[3]}};
+
+function decoysFor(v,n){
+  if(!n)return [];
+  const mine=new Set(words(v.text).map(w=>bare(w).toLowerCase()));
+  const pool=inPath(v.path).filter(o=>o.id!==v.id)
+    .flatMap(o=>words(o.text).map(bare))
+    .filter(w=>w.length>3 && !mine.has(w.toLowerCase()));
+  return shuffle([...new Set(pool)]).slice(0,n);
+}
+function skeleton(text,reveal){
+  return words(text).map((w,i)=>{
+    if(i<reveal)return `<span class="filled">${esc(w)}</span>`;
+    const f=w.match(/[A-Za-z]/), tail=w.match(/[.,;:?!]$/);
+    return `<span class="${i===reveal?"cursor":""}">${f?f[0]:"·"}${tail?tail[0]:""}</span>`;
+  }).join(" ");
+}
+function erosionStrip(v){
+  const st=progress[v.id].stage, ws=words(v.text);
+  const keep=[1,1,.7,.4,.15,0][st];
+  return ws.slice(0,11).map((w,i)=>{
+    const show=i/Math.min(ws.length,11)<keep, f=w.match(/[A-Za-z]/);
+    return show?esc(w.replace(/[.,;:]$/,"")):`<span class="gone">${f?f[0]:"·"}</span>`;
+  }).join(" ")+(ws.length>11?" …":"");
+}
+function dueLabel(v){
+  const p=progress[v.id], d=Math.min(p.due,p.refDue)-Date.now();
+  if(d<=0)return "due now";
+  const n=Math.ceil(d/DAY);
+  return n===1?"due tomorrow":`due in ${n} days`;
+}
+
+/* ============================================================
+   DUE ITEMS — three kinds
+   ============================================================ */
+function itemsFor(pathId,force){
+  const now=Date.now(), out=[];
+  inPath(pathId).forEach(v=>{
+    const p=progress[v.id];
+    if(force||p.due<=now)                       out.push({kind:"text",id:v.id});
+    if(p.stage>=2 && (force||p.refDue<=now))    out.push({kind:"ref", id:v.id});
+    if(p.stage>=3 && now-p.lastAloud>ALOUD_GAP) out.push({kind:"aloud",id:v.id});
+  });
+  return out;
+}
+
+/* ============================================================
+   SCHEDULING
+   ============================================================ */
+function gradeText(id,ok){
+  const p=progress[id]; p.seen++;
+  if(ok){p.stage=Math.min(5,p.stage+1);p.due=Date.now()+INTERVALS[p.stage]*DAY}
+  else{p.stage=Math.max(2,p.stage-1);p.due=0}
+  save();
+}
+function gradeRef(id,ok){
+  const p=progress[id];
+  if(ok){p.refStage=Math.min(3,p.refStage+1);p.refDue=Date.now()+REFINTERVALS[p.refStage]*DAY}
+  else{p.refStage=Math.max(1,p.refStage-1);p.refDue=0}
+  save();
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+function render(){
+  if(view.screen!=="session")stopClock();
+  const el=$("app");
+  if(view.screen==="paths")el.innerHTML=viewPaths();
+  else if(view.screen==="path")el.innerHTML=viewPath();
+  else if(view.screen==="session")return renderItem();
+  else if(view.screen==="summary")el.innerHTML=viewSummary();
+  window.scrollTo(0,0);
+}
+const masthead=()=>`<div class="masthead">
+  <div class="wordmark">Engra<span>ve</span></div>
+  <div class="held-tally"><b>${held()}</b> / ${VERSES.length} held</div></div>`;
+
+function viewPaths(){
+  return masthead()+
+  `<p class="eyebrow">Memorization</p>
+   <h1>Keep it, don't just read it</h1>
+   <p class="sub">Five minutes. The words come off the page a little more each time, and the address goes on the same ladder as the text.</p>`+
+  PATHS.map(p=>{
+    const vs=inPath(p.id), d=itemsFor(p.id).length;
+    const avg=(vs.reduce((s,v)=>s+progress[v.id].stage,0)/vs.length).toFixed(1);
+    return `<button class="path" onclick="go('${p.id}')">
+      <div class="path-top"><span class="path-name">${p.name}</span>
+        <span class="path-count">${vs.length} verses · rung ${avg}</span></div>
+      <div class="path-blurb">${p.blurb}</div>
+      <div class="erosion">${erosionStrip(vs[0])}</div>
+      <div class="path-due ${d?"":"none"}">${d?`${d} item${d>1?"s":""} ready`:"nothing due"}</div>
+    </button>`}).join("")+
+  `<button class="btn ghost sm" onclick="reset()">Reset all progress</button>
+   <p class="note">Prototype. KJV (public domain). “Engrave” is a placeholder name.</p>`;
+}
+
+function viewPath(){
+  const p=PATHS.find(x=>x.id===view.path), vs=inPath(p.id), items=itemsFor(p.id);
+  return `<button class="back" onclick="go(null)">← Paths</button>
+    <p class="eyebrow" style="margin-top:16px">Path</p><h2>${p.name}</h2><p class="sub">${p.blurb}</p>`+
+    vs.map(v=>{const pr=progress[v.id];
+      return `<div class="vrow">
+        <div class="vrow-top"><span class="ref">${v.ref}</span>
+          <span class="tracks">
+            <span class="rungs">${[1,2,3,4,5].map(i=>`<i class="rung ${i<=pr.stage?"on":""}"></i>`).join("")}</span>
+            <span class="rungs">${[1,2,3].map(i=>`<i class="rung ref ${i<=pr.refStage?"on":""}"></i>`).join("")}</span>
+          </span></div>
+        <div class="erosion">${erosionStrip(v)}</div>
+        <div class="vrow-state">${STAGES[pr.stage-1].toUpperCase()} · ADDRESS ${REFSTAGES[pr.refStage-1].toUpperCase()} · ${dueLabel(v)}</div></div>`}).join("")+
+    `<button class="btn" onclick="startSession()" ${items.length?"":"disabled"}>
+      ${items.length?`Start · 5 minutes`:"All caught up — come back later"}</button>
+     ${items.length?"":`<button class="btn ghost sm" onclick="startSession(true)">Practise anyway</button>`}
+     <p class="note">Gold rungs are the text, green are book, chapter and verse. A verse counts as held only when both tracks are full.</p>`;
+}
+
+/* ============================================================
+   SESSION — capped at five minutes
+   ============================================================ */
+function startSession(force){
+  const items=shuffle(itemsFor(view.path,force));
+  session={queue:items,done:0,right:0,advanced:[],deploy:null,
+           start:Date.now(),overrun:false,looked:false};
+  view.screen="session"; nextItem();
+}
+function timeLeft(){return Math.max(0,SESSION_MS-(Date.now()-session.start))}
+function startClock(){
+  stopClock();
+  ticker=setInterval(()=>{
+    const c=$("clock"), b=$("timefill");
+    if(!c)return stopClock();
+    const left=timeLeft(), m=Math.floor(left/60000), s=Math.floor(left%60000/1000);
+    if(left>0){c.textContent=`${m}:${String(s).padStart(2,"0")} left`;
+      b.style.width=(left/SESSION_MS*100)+"%"}
+    else{c.textContent="last one";c.classList.add("last");
+      b.parentElement.classList.add("last");b.style.width="100%";stopClock()}
+  },1000);
+}
+function stopClock(){if(ticker){clearInterval(ticker);ticker=null}}
+
+function nextItem(){
+  // the five minutes are up: finish the question in hand, then stop
+  if(timeLeft()<=0 && !session.overrun){session.overrun=true}
+  if(session.overrun && session.servedAfterBell){return endSession()}
+  if(!session.queue.length)return endSession();
+  if(session.overrun)session.servedAfterBell=true;
+  renderItem();
+}
+function endSession(){
+  stopClock();
+  const pool=DEPLOY[view.path]||[];
+  const ready=inPath(view.path).filter(v=>progress[v.id].stage>=3).map(v=>v.id);
+  const q=pool.find(x=>ready.includes(x.a));
+  if(q&&!session.deploy&&!session.skipDeploy){session.deploy=q;return renderDeploy()}
+  view.screen="summary"; render();
+}
+
+function renderItem(){
+  const it=session.queue[0], v=verse(it.id);
+  session.looked=false;
+  const left=timeLeft();
+  const m=Math.floor(left/60000), s=Math.floor(left%60000/1000);
+  const clockTxt=left>0?`${m}:${String(s).padStart(2,"0")} left`:"last one";
+
+  let bar,label,body;
+  if(it.kind==="text"){
+    const st=progress[it.id].stage;
+    bar=[1,2,3,4,5].map(i=>`<i class="stage-seg ${i<st?"done":i===st?"now":""}"></i>`).join("");
+    label=`<b>Rung ${st} · ${STAGES[st-1]}</b>`;
+    body = st===1?exRead(v) : st===5?exCold(v) : exFill(v,st);
+  }else if(it.kind==="ref"){
+    const rs=progress[it.id].refStage;
+    bar=[1,2,3].map(i=>`<i class="stage-seg ${i<rs?"done":i===rs?"now":""}"></i>`).join("");
+    label=`<b class="kindref">Address · ${REFSTAGES[rs-1]}</b>`;
+    body = [exRefRecognise,exRefMatch,exRefBuild][rs-1](v);
+  }else{
+    bar=`<i class="stage-seg now"></i>`;
+    label=`<b>Say it</b>`;
+    body=exAloud(v);
+  }
+
+  $("app").innerHTML=
+   `<div class="sesstop"><button class="back" onclick="quit()">← End session</button>
+      <span class="clock ${left>0?"":"last"}" id="clock">${clockTxt}</span></div>
+    <div class="timebar ${left>0?"":"last"}"><i id="timefill" style="width:${left>0?left/SESSION_MS*100:100}%"></i></div>
+    <div class="stage-bar">${bar}</div>
+    <div class="stage-label"><span>${it.kind==="ref"&&progress[it.id].refStage>1?"&nbsp;":v.ref}</span>${label}</div>
+    <button class="lookup" id="lookup" onclick="lookUp('${it.id}')">Look it up</button>
+    <div id="reveal"></div>
+    ${body}`;
+  startClock();
+  window.scrollTo(0,0);
+}
+
+/* always available, but it costs the rung */
+function lookUp(id){
+  const b=$("lookup"), box=$("reveal");
+  if(session.looked){box.innerHTML="";session.looked=false;
+    b.classList.remove("used");b.textContent="Look it up";return}
+  session.looked=true;
+  b.classList.add("used"); b.textContent="Hide it — this one won't advance";
+  const v=verse(id);
+  box.innerHTML=`<div class="reveal"><span class="ref">${v.ref}</span><p>${esc(v.text)}</p></div>`;
+  box.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+/* ---------- text exercises ---------- */
+function exRead(v){
+  return `<p class="prompt">Read it out loud, once, slowly. Saying it aloud does most of the work.</p>
+    <p class="scripture">${esc(v.text)}</p>
+    <button class="btn" onclick="finishText('${v.id}',true,'Now it starts coming apart.')">I've read it aloud</button>`;
+}
+function exAloud(v){
+  return `<p class="prompt">Nothing to solve. Say it out loud from the page — the sound of it is half of what you're keeping.</p>
+    <p class="scripture">${esc(v.text)}</p>
+    <button class="btn" onclick="doneAloud('${v.id}')">Said it</button>`;
+}
+function doneAloud(id){
+  progress[id].lastAloud=Date.now(); save();
+  session.done++; session.queue.shift();
+  $("app").insertAdjacentHTML("beforeend",
+    `<div class="verdict good">Spoken<span class="detail">Back in about a week, whatever rung it's on.</span></div>
+     <button class="btn" onclick="nextItem()">Next</button>`);
+  document.querySelector(".verdict").scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+function buildRound(v,stage){
+  const ws=words(v.text);
+  let n=Math.min(ws.length, Math.max(3, Math.round(ws.length*FRACTION[stage])));
+  n=Math.min(n,MAXGAP);
+  const room=ws.length-n;
+  const start=room<=0?0:(progress[v.id].seen*5+((Math.random()*room)|0))%(room+1);
+  const idx=[...Array(n).keys()].map(i=>start+i);
+  return {ws,idx,bank:shuffle(idx.map(i=>ws[i]).concat(decoysFor(v,DECOYS[stage]))),placed:[],checked:false};
+}
+function exFill(v,st){
+  round=buildRound(v,st);
+  const share=Math.round(round.idx.length/round.ws.length*100), d=DECOYS[st];
+  return `<p class="prompt">${share>=95?"The whole verse is on tiles.":`About ${share}% of the verse is missing.`} Tap the words in order.${d?` ${d} word${d>1?"s":""} in the bank ${d>1?"don't":"doesn't"} belong.`:""}</p>
+    <div class="cloze" id="cloze">${drawCloze()}</div>
+    <div class="bank" id="bank">${round.bank.map((w,i)=>
+      `<button class="tile" id="t${i}" onclick="place(${i})">${esc(w)}</button>`).join("")}</div>
+    <button class="btn" id="check" onclick="checkFill('${v.id}')" disabled>Check</button>
+    <button class="btn ghost sm" onclick="undo()">Undo last word</button>`;
+}
+function drawCloze(){
+  const r=round, set=new Set(r.idx);
+  return r.ws.map((w,i)=>{
+    if(!set.has(i))return esc(w);
+    const k=r.idx.indexOf(i), b=r.placed[k];
+    if(b===undefined)return `<span class="gap ${k===r.placed.length?"next":""}">&nbsp;</span>`;
+    if(!r.checked)return `<span class="gap">${esc(r.bank[b])}</span>`;
+    const ok=r.bank[b]===w;
+    return `<span class="gap ${ok?"ok":"bad"}">${esc(r.bank[b])}${ok?"":`<span class="truth">${esc(w)}</span>`}</span>`;
+  }).join(" ");
+}
+function place(i){
+  if(round.checked||round.placed.length>=round.idx.length)return;
+  round.placed.push(i); $("t"+i).classList.add("used");
+  $("cloze").innerHTML=drawCloze(); $("check").disabled=round.placed.length!==round.idx.length;
+}
+function undo(){
+  if(round.checked||!round.placed.length)return;
+  const i=round.placed.pop(); $("t"+i).classList.remove("used");
+  $("cloze").innerHTML=drawCloze(); $("check").disabled=true;
+}
+function checkFill(id){
+  round.checked=true;
+  const ok=round.idx.every((wi,k)=>round.bank[round.placed[k]]===round.ws[wi]);
+  $("cloze").innerHTML=drawCloze(); $("check").disabled=true;
+  document.querySelectorAll("#bank .tile").forEach(t=>t.style.pointerEvents="none");
+  finishText(id,ok, ok?"Word for word.":"Gold shows what it actually says.");
+}
+function exCold(v){
+  round={ws:words(v.text),filled:0,slips:0,bank:shuffle(words(v.text).concat(decoysFor(v,DECOYS[5])))};
+  return `<p class="prompt">First letters only. Tap each word in turn — the letter tells you which, if you have it.</p>
+    <div class="skeleton" id="sk">${skeleton(v.text,0)}</div>
+    <div class="bank" id="bank">${round.bank.map((w,i)=>
+      `<button class="tile" id="t${i}" onclick="pickCold(${i},'${v.id}')">${esc(w)}</button>`).join("")}</div>`;
+}
+function pickCold(i,id){
+  const r=round;
+  if(r.bank[i]===r.ws[r.filled]){
+    r.filled++; $("t"+i).classList.add("used");
+    $("sk").innerHTML=skeleton(verse(id).text,r.filled);
+    if(r.filled===r.ws.length){
+      document.querySelectorAll("#bank .tile").forEach(t=>t.style.pointerEvents="none");
+      finishText(id, r.slips<=1, r.slips===0?"Clean run.":
+        r.slips===1?"One slip — still counts.":`${r.slips} slips. Stays on this rung.`);
+    }
+  }else{
+    r.slips++; const el=$("t"+i); el.classList.add("reject");
+    setTimeout(()=>el.classList.remove("reject"),420);
+  }
+}
+
+/* ---------- address exercises ---------- */
+function refOptions(v,n){
+  const others=shuffle(VERSES.filter(o=>o.id!==v.id)).slice(0,n-1);
+  return shuffle([v,...others]);
+}
+function exRefRecognise(v){
+  window._ref=refOptions(v,4);
+  return `<p class="prompt">Where is this?</p>
+    <p class="scripture" style="margin-bottom:20px">${esc(v.text)}</p>`+
+    window._ref.map((o,i)=>`<button class="choice mono" id="r${i}" onclick="pickRef(${i},'${v.id}')">${o.ref}</button>`).join("")+
+    `<div id="after"></div>`;
+}
+function exRefMatch(v){
+  window._ref=refOptions(v,4);
+  return `<p class="prompt">Which verse is this?</p>
+    <p class="refslot" style="margin-bottom:20px">${v.ref}</p>`+
+    window._ref.map((o,i)=>`<button class="choice" id="r${i}" onclick="pickRef(${i},'${v.id}')">${esc(o.text.slice(0,68))}${o.text.length>68?"…":""}</button>`).join("")+
+    `<div id="after"></div>`;
+}
+function pickRef(i,id){
+  const ok=window._ref[i].id===id;
+  window._ref.forEach((o,j)=>{const el=$("r"+j);el.disabled=true;
+    if(o.id===id)el.className=el.className.replace(/ (right|wrong)/,"")+" right";
+    else if(j===i)el.className+=" wrong"});
+  finishRef(id,ok, ok?"That's the address.":`It's ${verse(id).ref}.`);
+}
+function exRefBuild(v){
+  const r=parseRef(v.ref);
+  const books=shuffle([r.book,...shuffle(BOOKS.filter(b=>b!==r.book)).slice(0,5)]);
+  const near=n=>shuffle([...new Set([n,n+1,Math.max(1,n-1),n+3,Math.max(1,n-2),n+7])]).slice(0,6);
+  window._build={r,step:0,slips:0,got:{}};
+  return `<p class="prompt">Build the address. Book, then chapter, then verse.</p>
+    <p class="scripture" style="margin-bottom:18px">${esc(v.text)}</p>
+    <div class="refslot" id="rs"><span class="empty">book</span> <span class="empty">·</span> <span class="empty">ch</span>:<span class="empty">vs</span></div>
+    <div class="bank" id="bank">${books.map((b,i)=>
+      `<button class="tile" onclick="pickBuild(this,'${b.replace(/'/g,"\\'")}','${v.id}')">${b}</button>`).join("")}</div>
+    <div class="bank" id="nums" style="margin-top:10px"></div>
+    <script type="application/json" id="nums-data">${JSON.stringify({ch:near(r.ch),vs:near(r.vs)})}<\/script>`;
+}
+function pickBuild(el,val,id){
+  const b=window._build, r=b.r;
+  const want=[r.book,String(r.ch),String(r.vs)][b.step];
+  if(val!==want){b.slips++;el.classList.add("reject");
+    return setTimeout(()=>el.classList.remove("reject"),420)}
+  el.classList.add("used");
+  b.got[["book","ch","vs"][b.step]]=val; b.step++;
+  $("rs").innerHTML=`${b.got.book||'<span class="empty">book</span>'} `+
+    `${b.got.ch||'<span class="empty">ch</span>'}:${b.got.vs||'<span class="empty">vs</span>'}`;
+  if(b.step===1||b.step===2){
+    const data=JSON.parse($("nums-data").textContent);
+    const list=b.step===1?data.ch:data.vs;
+    $("nums").innerHTML=list.map(n=>
+      `<button class="tile num" onclick="pickBuild(this,'${n}','${id}')">${n}</button>`).join("");
+    if(b.step===1)document.querySelectorAll("#bank .tile").forEach(t=>t.style.pointerEvents="none");
+  }
+  if(b.step===3){
+    $("nums").querySelectorAll(".tile").forEach(t=>t.style.pointerEvents="none");
+    finishRef(id,b.slips<=1, b.slips===0?"Book, chapter and verse.":
+      b.slips===1?"One slip — still counts.":`${b.slips} slips. Stays on this rung.`);
+  }
+}
+
+/* ---------- verdicts ---------- */
+function afterGrade(ok,before,after,msg,ladder){
+  session.done++; if(ok)session.right++;
+  if(ok&&after>before)session.advanced.push(1);
+  session.queue.shift();
+  $("app").insertAdjacentHTML("beforeend",
+    `<div class="verdict ${ok?"good":"bad"}">${ok?"Correct":"Missed"}
+      <span class="detail">${esc(msg)}${session.looked?" Looked up, so it stays where it is.":
+        ok&&after>before?` Moves to ${ladder} ${after}.`:ok?"":` Drops to ${ladder} ${after}.`}</span></div>
+     <button class="btn" onclick="nextItem()">${timeLeft()>0&&session.queue.length?"Next":"Finish"}</button>`);
+  document.querySelector(".verdict").scrollIntoView({behavior:"smooth",block:"center"});
+}
+function finishText(id,ok,msg){
+  const before=progress[id].stage;
+  if(session.looked){progress[id].due=0;save()} else gradeText(id,ok);
+  if(!ok&&!session.looked)session.queue.push({kind:"text",id});
+  afterGrade(ok&&!session.looked,before,progress[id].stage,msg,"rung");
+}
+function finishRef(id,ok,msg){
+  const before=progress[id].refStage;
+  if(session.looked){progress[id].refDue=0;save()} else gradeRef(id,ok);
+  afterGrade(ok&&!session.looked,before,progress[id].refStage,msg,"address rung");
+}
+
+/* ---------- deploy ---------- */
+function renderDeploy(){
+  const q=session.deploy;
+  const ready=inPath(view.path).filter(v=>progress[v.id].stage>=3);
+  let opts=shuffle(ready).slice(0,4);
+  if(!opts.some(o=>o.id===q.a))opts[0]=verse(q.a);
+  window._dep=shuffle(opts);
+  $("app").innerHTML=`<p class="eyebrow">Use it · past the bell</p><h2>Which verse do you reach for?</h2>
+    <p class="prompt">${esc(q.q)}</p>`+
+    window._dep.map((v,i)=>`<button class="choice" id="d${i}" onclick="pickDeploy(${i})">
+      <span class="ref">${v.ref}</span><br>${esc(v.text.slice(0,72))}${v.text.length>72?"…":""}</button>`).join("")+
+    `<div id="after"></div>`;
+}
+function pickDeploy(i){
+  const q=session.deploy, right=window._dep[i].id===q.a;
+  window._dep.forEach((v,j)=>{const el=$("d"+j);el.disabled=true;
+    if(v.id===q.a)el.className="choice right"; else if(j===i)el.className="choice wrong"});
+  $("after").innerHTML=`<div class="verdict ${right?"good":"bad"}">
+    ${right?"That's the one":"The stronger answer is "+verse(q.a).ref}
+    <span class="detail">Memorizing only pays off if the verse arrives when it's needed.</span></div>
+    <button class="btn" onclick="view.screen='summary';render()">Finish</button>`;
+}
+
+function viewSummary(){
+  const mins=Math.round((Date.now()-session.start)/1000);
+  return masthead()+
+   `<p class="eyebrow">Session complete</p><h2>${PATHS.find(p=>p.id===view.path).name}</h2><p class="sub">&nbsp;</p>
+    <div class="stat"><span>Time</span><b>${Math.floor(mins/60)}:${String(mins%60).padStart(2,"0")}</b></div>
+    <div class="stat"><span>Questions answered</span><b>${session.done}</b></div>
+    <div class="stat"><span>Correct first time</span><b>${session.right}</b></div>
+    <div class="stat"><span>Rungs climbed</span><b>${session.advanced.length}</b></div>
+    <div class="stat"><span>Held across all paths</span><b>${held()} / ${VERSES.length}</b></div>
+    <button class="btn" onclick="go('${view.path}')">Back to path</button>
+    <button class="btn ghost sm" onclick="go(null)">All paths</button>
+    <p class="note">Anything still due waits for tomorrow. Five minutes is the whole promise — the queue bends to the clock, not the other way round.</p>`;
+}
+
+function go(p){view={screen:p?"path":"paths",path:p};render()}
+function quit(){stopClock();view.screen="path";render()}
+function reset(){progress=blank();save();render()}
+load();
+</script>
+</body>
+</html>

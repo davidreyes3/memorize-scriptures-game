@@ -1,0 +1,648 @@
+# Engrave — implementation spec
+
+**This is the *how*.** [`spec.md`](spec.md) is the *why and what* and stays the reasoning
+document; where the two disagree, **this file wins**. The frozen prototype at
+[`../prototype/engrave.html`](../prototype/engrave.html) is the behavioural reference —
+read it to answer "how should this feel?", never develop in it.
+
+Status: no application code exists yet. Everything below is the target.
+
+---
+
+## 1. Product in one paragraph
+
+A verse memorization app for a German-speaking, UCG-doctrine-aligned audience. Each verse is
+learned on **two independent ladders** — the words, and the address (book, chapter, verse).
+Exercises are **generated from the verse text itself**, never authored per verse. A session is
+**five minutes**, on a real visible clock. Everything runs locally in the browser, offline.
+
+Two constraints govern every decision:
+
+1. **Zero authoring per verse.** Adding a verse = adding a reference and its text. Nothing else.
+2. **Five minutes is the promise.** The queue bends to the clock, never the reverse.
+
+---
+
+## 2. Decisions that override `spec.md`
+
+`spec.md` was written KJV-only and English-only, and left four questions open. All are now settled.
+
+| Topic | Decision | Supersedes |
+|---|---|---|
+| Scripture text | **Luther 1912** first; KJV added later | §2 |
+| UI language | **German**; all strings in `src/i18n/` so English can follow | new |
+| Verse text source | **The user supplies it.** Never write scripture from memory | new |
+| Repo scope | This module only, not the larger Bible app | §1 |
+| Deploy round | **Cut for v1** | §6, §10.3 |
+| Long verses | **Cap rung 5 at `MAX_WINDOW`**, like rung 4. No authored split points | §10.1 |
+| New verses per day | **2**, counted globally across all paths | §10.2 |
+| Aloud gating | Never gates progression | §10.4 |
+| TTS | None. The user speaks; the app is silent | stray §11 mention |
+| Interaction | **Tap only.** No drag-and-drop, no typing | §9 (confirms) |
+| Architecture | React + Vite + TypeScript + Vitest | §1 (confirms) |
+| Persistence | `localStorage` only | new |
+| Visual identity | **Reversed.** A pilgrimage trail — verses as stepping stones, moss/stone/brass, daylight — replaces spec §9's dark manuscript look. See §7 | §9 (reverses) |
+| Session timer | **Reversed. Fully invisible** — no countdown, no draining bar, anywhere | §4 (reverses) |
+
+Cutting Deploy removes what §6 calls *"the point of the whole module"* — a deliberate call.
+The upside: **zero-authoring is now absolute.** No hand-written content remains anywhere in the app.
+
+---
+
+## 3. Data types
+
+```ts
+type VerseId  = string;
+type PathId   = string;
+type TextRung = 1 | 2 | 3 | 4 | 5;
+type RefRung  = 1 | 2 | 3;
+
+interface Verse {
+  id:   VerseId;
+  path: PathId;
+  ref:  string;   // German form: "1. Mose 1,1"
+  text: string;   // Luther 1912, transcribed exactly. Never generated.
+}
+
+interface Path {
+  id: PathId;
+  name: string;
+  blurb: string;
+}
+
+interface VerseProgress {
+  stage:        TextRung;       // text ladder
+  due:          number;         // epoch ms; 0 = due now
+  seen:         number;         // repeat counter; drives the window shift
+  refStage:     RefRung;        // address ladder
+  refDue:       number;
+  lastAloud:    number;         // epoch ms; 0 = never
+  introducedAt: number | null;  // null = not yet in rotation
+}
+
+interface SaveData {
+  schemaVersion: number;
+  progress:      Record<VerseId, VerseProgress>;
+  introductions: Record<string, number>;  // "YYYY-MM-DD" -> verses introduced that day
+  settings:      Settings;
+}
+
+interface Settings {
+  newPerDay: number;   // default DEFAULT_NEW_PER_DAY; user-adjustable
+}
+```
+
+New verses start `{ stage:1, due:0, seen:0, refStage:1, refDue:0, lastAloud:0, introducedAt:null }`.
+
+### Constants
+
+| Name | Value | Meaning |
+|---|---|---|
+| `FRACTION` | `[0, 0, .3, .6, 1, 1]` | share of the verse hidden, indexed by text rung |
+| `DECOYS` | `[0, 0, 0, 1, 2, 3]` | spare words in the bank, by text rung |
+| `INTERVALS` | `[0, 1, 2, 4, 9, 21]` | days until next review, by rung reached |
+| `REF_INTERVALS` | `[0, 2, 6, 21]` | same, address ladder |
+| `MAX_WINDOW` | `14` | most words hidden at once — **now applies at rung 5 too** |
+| `MIN_WINDOW` | `3` | fewest, unless the verse is shorter |
+| `SESSION_MS` | `300_000` | five minutes |
+| `ALOUD_GAP_MS` | `7 * 86_400_000` | how often a held verse is read aloud again |
+| `DEFAULT_NEW_PER_DAY` | `2` | verses introduced per day, **across all paths**. Seeds `settings.newPerDay`, which the user can change |
+| `EROSION_MAX_CHARS` | `60` | how much of a verse the erosion strip shows before truncating |
+| `SCHEMA_VERSION` | `1` | bump on any `SaveData` shape change |
+
+Rung names: `["Lesen","Satzteil","Abschnitt","Aufbau","Kalt"]`.
+Address rung names: `["Erkennen","Zuordnen","Bilden"]`.
+
+---
+
+## 4. Algorithms
+
+**The rule that makes this testable:** every function in `game/` and `srs/` is **pure**. Time and
+randomness are injected — `now: number` and `rng: () => number` are parameters, never
+`Date.now()` or `Math.random()` called inside. Nothing in these folders imports React.
+
+### 4.1 Seeded randomness
+
+```ts
+function hashSeed(...parts: Array<string | number>): number  // FNV-1a over the joined parts
+function mulberry32(seed: number): () => number              // returns [0,1)
+function shuffle<T>(items: T[], rng: () => number): T[]      // Fisher–Yates, non-mutating
+```
+
+Any round built from `(verseId, seen)` must reproduce exactly. This is what makes round
+construction assertable in tests.
+
+### 4.2 Text handling
+
+```ts
+tokenize(text: string): string[]     // text.trim().split(/\s+/)
+bare(word: string): string           // word.replace(/[^\p{L}']/gu, "")
+```
+
+Punctuation **stays attached to its word** — a tile is never bare punctuation. `„Wort"` is one tile.
+
+> ⚠️ **Deviation.** The prototype's `bare()` uses `/[^A-Za-z']/g`
+> ([engrave.html:251](../prototype/engrave.html#L251)), which deletes **ä ö ü ß**. `Väter` became
+> `Vter`, breaking decoy de-duplication and the "not in target verse" check. Now Unicode-aware.
+
+### 4.3 Round construction
+
+```ts
+buildRound(verse: Verse, stage: TextRung, seen: number): Round
+
+interface Round {
+  tokens: string[];    // the whole verse
+  window: number[];    // contiguous indices being hidden
+  bank:   string[];    // shuffled: window words + decoys
+  placed: number[];    // indices into bank, in the order tapped
+}
+```
+
+```
+len    = tokens.length
+n      = min(len, MAX_WINDOW, max(MIN_WINDOW, round(len * FRACTION[stage])))
+room   = len - n
+rng    = mulberry32(hashSeed(verse.id, seen))
+start  = room <= 0 ? 0 : floor(rng() * (room + 1))
+window = [start … start + n - 1]
+bank   = shuffle([...window.map(i => tokens[i]), ...decoysFor(verse, DECOYS[stage], rng)], rng)
+```
+
+> ⚠️ **Deviation.** The prototype used `start = (seen*5 + random(room)) % (room+1)`
+> ([engrave.html:483](../prototype/engrave.html#L483)). That mixes a counter with live
+> `Math.random()`, so identical inputs give different windows and it cannot be asserted on.
+> A pure fixed stride (`seen*5`) was also rejected: when `room+1` is 5 or 10 the window
+> barely moves — `gcd(5, 10) = 5` gives a two-position cycle. The seeded PRNG is
+> deterministic, testable, and well distributed.
+
+**Edge cases:** verses shorter than `MIN_WINDOW` use `n = len`. When `room === 0` the window is
+the whole verse and `start` is 0.
+
+### 4.4 Decoys
+
+```ts
+decoysFor(verse: Verse, n: number, rng: () => number): string[]
+```
+
+Pool = every other verse **in the same path** → `tokenize` → `bare` → keep length > 3 → drop any
+word present in the target verse (case-insensitive) → de-duplicate → `shuffle(rng)` → take `n`.
+
+Same register as the target, plausible, and free — no authoring. Returns `[]` when `n` is 0.
+
+> **Edge case the prototype ignores:** a path holding one verse has an empty pool, so fewer decoys
+> than requested come back. That is allowed. It must not throw, and the UI must not assume
+> `bank.length === window.length + DECOYS[stage]`.
+
+### 4.5 Grading
+
+```ts
+gradeText(p: VerseProgress, ok: boolean, now: number): VerseProgress
+gradeRef (p: VerseProgress, ok: boolean, now: number): VerseProgress
+```
+
+| | pass | fail |
+|---|---|---|
+| Text | `stage = min(5, stage+1)`, `due = now + INTERVALS[stage]·day` | `stage = max(2, stage-1)`, `due = 0`, requeued this session |
+| Address | `refStage = min(3, refStage+1)`, `refDue = now + REF_INTERVALS[refStage]·day` | `refStage = max(1, refStage-1)`, `refDue = 0` |
+
+`seen` increments on every graded text round, pass or fail. Rungs floor at 2 and 1 — a miss never
+sends a verse back to *Lesen*.
+
+**Pass criteria:** fill rounds (2–4) require an exact word-for-word match. *Kalt* (5) and address
+*Bilden* (3) pass at **`slips <= 1`**.
+
+**Look it up** — always available, always costs the rung. When used: no rung changes in either
+direction, `due = 0` so the verse returns the same day, and the round is not requeued.
+
+### 4.6 The Cold rung and long verses
+
+> ⚠️ **Deviation.** The prototype's `exCold` puts the *entire* verse on tiles
+> ([engrave.html:525](../prototype/engrave.html#L525)), so 1. Korinther 15,52 demands 31 taps —
+> §10.1 flags this as a genuine mobile problem.
+
+*Kalt* now uses the **same windowing as every other rung**, so `MAX_WINDOW` applies:
+
+- Words **outside** the window render in full, in the serif face.
+- Words **inside** the window render as **first letters only**, filling in as they are tapped in order.
+- 3 decoys, per `DECOYS[5]`.
+
+For verses of 14 words or fewer the window is the whole verse and behaviour is identical to the
+prototype. Only long verses change. No authored split points, so zero-authoring holds.
+
+### 4.7 Skeleton rendering
+
+```ts
+skeleton(tokens: string[], revealCount: number): SkeletonPart[]
+```
+
+Words before `revealCount` render in full. The rest render as **first letter + any trailing
+punctuation** (`Anfang,` → `A,`). A word with no letter renders `·`.
+
+> ⚠️ **Deviation.** Prototype matched the first letter with `/[A-Za-z]/`
+> ([engrave.html:265](../prototype/engrave.html#L265)), so *Ägypten* rendered as `·`. Use `/\p{L}/u`.
+
+### 4.8 German references
+
+```ts
+parseRef(ref: string): { book: string; chapter: number; verse: number; verseEnd?: number }
+formatRef(parts): string
+```
+
+Pattern: `/^(.+?)\s+(\d+),(\d+)(?:–(\d+))?$/` — German uses a **comma**, book names may carry an
+ordinal prefix (`1. Mose`, `2. Timotheus`), and a memorization item may span a **verse range**
+like `1. Mose 2,2–3` using an **en dash (–, U+2013)**, never a hyphen. Malformed input throws.
+
+A ranged item is still exactly one `Verse` — one reference, one concatenated `text` covering every
+verse in the range. The address-*Bilden* exercise (build the reference from tiles) only ever
+targets the **start** verse number; `verseEnd` is a display-only detail the user never has to
+reconstruct.
+
+> ⚠️ **Deviation.** The prototype expects `Book 1:1` with a colon
+> ([engrave.html:252](../prototype/engrave.html#L252)). Both the parser and the address-*Bilden*
+> exercise need this.
+
+`BOOKS` (German, for the address word bank — a one-time constant, never revisited):
+
+```
+1. Mose, 2. Mose, 3. Mose, 4. Mose, 5. Mose, Josua, Psalm, Sprüche, Prediger, Jesaja,
+Jeremia, Hesekiel, Daniel, Hosea, Maleachi, Matthäus, Markus, Lukas, Johannes,
+Apostelgeschichte, Römer, 1. Korinther, 2. Korinther, Galater, Epheser, Philipper,
+Kolosser, 1. Thessalonicher, 1. Timotheus, 2. Timotheus, Titus, Hebräer, Jakobus,
+1. Petrus, 1. Johannes, Judas, Offenbarung
+```
+
+Chapter and verse options are near-misses around the true number: `{n, n±1, n±2, n+3, n+7}`,
+floored at 1, de-duplicated, six shown.
+
+### 4.9 Introducing new verses
+
+**New — nothing in the prototype does this.** All verses currently start `due: 0`
+([engrave.html:229](../prototype/engrave.html#L229)), so all 11 arrive at once. With a larger
+library that guarantees a queue that never clears.
+
+```ts
+introduceNewVerses(save: SaveData, verses: Verse[], now: number): SaveData
+```
+
+Called once at session start, **before** queue assembly:
+
+1. `today = "YYYY-MM-DD"` in local time.
+2. `allowed = save.settings.newPerDay - (save.introductions[today] ?? 0)`; stop if `<= 0`.
+3. Take up to `allowed` verses with `introducedAt === null`, in declaration order.
+4. Stamp `introducedAt = now`, and add the count to `introductions[today]`.
+
+Verses with `introducedAt === null` **never enter a queue**. Prune `introductions` entries older
+than ~30 days on save so the object cannot grow without bound.
+
+The cap is **global across all paths** — it exists to bound total daily workload, and a per-path
+cap would scale with path count in exactly the wrong direction. It is **user-adjustable**
+(`settings.newPerDay`), because the right number only becomes obvious once five minutes has been
+lived with. Lowering it mid-library is always safe; it just slows introductions.
+
+Changing the setting never retroactively un-introduces a verse.
+
+### 4.10 Session queue
+
+```ts
+assembleQueue(pathId: PathId, save: SaveData, verses: Verse[], now: number, rng): QueueItem[]
+type QueueItem = { kind: "text" | "ref" | "aloud"; id: VerseId };
+```
+
+For each **introduced** verse in the path:
+
+| Kind | Condition |
+|---|---|
+| `text` | `due <= now` |
+| `ref` | `stage >= 2` **and** `refDue <= now` |
+| `aloud` | `stage >= 3` **and** `now - lastAloud > ALOUD_GAP_MS` |
+
+Shuffle the result. `aloud` is **not a test** — it shows the verse, asks the user to say it, resets
+the timer on "Gesagt", and grades nothing. It never gates progression (§10.4).
+
+A **"Trotzdem üben"** escape hatch assembles a queue ignoring due dates when nothing is due.
+
+### 4.11 Session clock
+
+`timeLeft = max(0, SESSION_MS - (now - startedAt))`.
+
+> ⚠️ **Deviation from spec.md §4.** The spec calls for the clock to be *"real and visible... shown
+> as a countdown and a draining bar."* That's reversed: **the timer is fully invisible.** No
+> countdown, no draining bar, no numeric badge anywhere in the UI — the five-minute cap is an
+> ambient background constraint the user never sees a display of. This fits the trail metaphor
+> (§7): nobody watches a stopwatch while walking a path, they just walk until they're done for
+> the day. The underlying mechanic is unchanged — `timeLeft`/`isOverrun` (`srs/session.ts`) are
+> still pure functions the session controller polls internally — only the display is gone.
+
+At zero the session does **not** cut off mid-question: the current item finishes, **exactly one
+more** is served, then the session ends — straight to the Zusammenfassung screen, with no
+forewarning label, since there is no visible clock for a warning to attach to. Anything still due
+rolls to tomorrow.
+
+---
+
+## 5. Module contracts
+
+```
+src/
+  game/        tokenize, bare, buildRound, decoysFor, skeleton, erosionStrip,
+               parseRef, formatRef, hashSeed, mulberry32, shuffle
+  srs/         gradeText, gradeRef, introduceNewVerses, assembleQueue,
+               isHeld, dueLabel
+  storage/     load(), save(), reset()  — localStorage, key "engrave.save"
+  data/        verses.de.ts, paths.de.ts, books.de.ts
+  i18n/        de.ts  (every user-facing string; the app name lives here too)
+  components/  React only
+```
+
+**`game/` and `srs/` import nothing from React and touch no browser globals.** They are plain
+functions over plain data. This is the single most important structural rule in the project.
+
+`storage/` is the only module allowed to touch `localStorage`. On load: parse, and if
+`schemaVersion` is missing or newer than `SCHEMA_VERSION`, **return defaults without overwriting
+the stored value** — never silently destroy progress. Any parse failure degrades to defaults.
+
+> ⚠️ **Deviation.** The prototype persists through `window.storage.get/set`
+> ([engrave.html:234](../prototype/engrave.html#L234)). That is the **Claude Artifacts runtime
+> API, not a browser API** — it does not exist in a Vite app and must become `localStorage`.
+
+`erosionStrip(verse, stage)` keeps `[1, 1, .7, .4, .15, 0][stage]` of the shown words in full and
+reduces the rest to first letters — the progress bar and study aid in one (`spec.md` §8).
+
+> ⚠️ **Deviation.** The prototype shows a fixed **first 11 words**
+> ([engrave.html:272](../prototype/engrave.html#L272)). German compounds — *Schöpfungsordnung*,
+> *Apostelgeschichte* — make a word count the wrong unit: 11 German words routinely overflow the
+> 520 px column while 11 short words underfill it. Instead accumulate words until the running
+> length would exceed `EROSION_MAX_CHARS` (60), then stop and append `…`. Always show at least
+> three words, however long they are.
+
+---
+
+## 6. Screens
+
+Four. Deploy is cut.
+
+**Pfade (paths list)** — masthead with *held* tally, one card per path showing name, blurb, and how
+many items are ready. Below: a **"Neue Verse pro Tag"** stepper bound to `settings.newPerDay`, and
+the reset control.
+
+Each card also carries a **mini-trail preview** — a small decorative squiggle with **always exactly
+3** dots, echoing the full stepping-stone trail on the Pfad screen at a glance. It's a symbol, not a
+counter: never one dot per verse. A path with 3 verses and a path with 30 render the identical
+squiggle shape; only the dots' colors shift with overall progress. The full trail on the Pfad screen
+carries no such simplification — it represents every verse individually and scales by scrolling,
+like a real long path.
+
+**Pfad (path detail)** — **the trail.** Not a list of rows: verses are stepping stones (§7.3)
+positioned along a winding SVG path, walked segment solid, the rest dotted. Each stone carries an
+opaque plaque below it with the reference and a short quote snippet. The primary *"Los geht's"*
+pill floats beside the current stone; when nothing is due it reads *"Alles erledigt"* with
+*"Trotzdem üben"* available. No pips, no per-verse rung numbers, no erosion strip — a stone's
+state **is** the progress display.
+
+**Sitzung (session item)** — shared chrome: end-session link, rung segments, reference,
+**Nachschlagen** button, reveal area. No countdown, no draining bar — per §4.11 the timer is fully
+invisible. Seven bodies:
+
+| Item | Body |
+|---|---|
+| Text 1 · Lesen | full verse, "Ich habe es laut gelesen". Not graded |
+| Text 2–4 | cloze with gaps + tile bank; *Prüfen* enabled once every gap is filled; *Rückgängig* |
+| Text 5 · Kalt | windowed first-letter skeleton + bank, tapped in order; wrong tile flashes and counts a slip |
+| Address 1 · Erkennen | verse shown, pick the reference from 4 |
+| Address 2 · Zuordnen | reference shown, pick the text from 4 |
+| Address 3 · Bilden | build book → chapter → verse from tiles |
+| Aloud | verse shown, "Gesagt". Not graded |
+
+After grading: a verdict block, then *Weiter* (or *Fertig*).
+
+**Zusammenfassung (summary)** — time, questions answered, first-time correct, rungs climbed, total held.
+
+---
+
+## 7. Visual system
+
+> ⚠️ **Deviation from spec.md §9.** The prototype's dark ink/vellum/gold manuscript look is
+> **replaced entirely** by a pilgrimage-trail identity: verses are stepping stones on a winding
+> path, engraved as they're mastered. Everything below is **settled and reviewed** — build to it.
+> A visual mockup exists as a published artifact — **"Waymarks"**,
+> <https://claude.ai/code/artifact/a91d943b-ce45-4b44-8301-52254cac72c9> — showing the trail, the
+> stone states and the graduation animation in motion. This section is the source of truth; the
+> artifact is a convenience, not a dependency, and may lag behind these notes.
+
+### 7.1 Palette
+
+Light is the default. Both themes ship — this is not a dark-only redesign. Follow the three-state
+theming rule (bare `:root` = light, `@media (prefers-color-scheme: dark)` guarded with
+`:root:not([data-theme="light"])`, plus `:root[data-theme="dark"]`), and never define a color only
+inside a media or `[data-theme]` block.
+
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--ground` | `#E7EAE0` | `#1B211A` | page ground, the trail floor |
+| `--surface` | `#F3F4EC` | `#232A20` | cards, plaques, phone frame |
+| `--surface-line` | `#D7DBCB` | `#35402F` | hairline borders |
+| `--ink` | `#262B23` | `#E7E9DC` | primary text |
+| `--ink-muted` | `#6B7364` | `#9BA38D` | secondary text |
+| `--stone` | `#ADB39F` | `#454F3F` | unhealed stone, untrodden path |
+| `--stone-line` | `#8B9280` | `#5B6652` | stone edges, dashed outlines |
+| `--moss` | `#4F6647` | `#7FA06E` | trodden path, healed pieces |
+| `--on-moss` | `#F1F3EA` | `#15220F` | text on moss |
+| `--waymark` | `#C6862F` | `#E3A94F` | **the single accent** — mastery only |
+| `--on-waymark` | `#2B2008` | `#2B1D06` | text on waymark |
+| `--water` | `#3E7D72` | `#5FAE9E` | correct |
+| `--clay` | `#A24A34` | `#C97456` | missed, and the look-up crutch |
+| `--trail-ahead` | `#C4C9B8` | `#3A4434` | dotted path not yet walked |
+
+Gold (`--waymark`) is spent **only** on fully-held verses and the primary action. If it starts
+appearing elsewhere, the mastery moment stops meaning anything.
+
+### 7.2 Type
+
+Four faces, each with one job. **Self-host all of them as `.woff2`** under a static asset path.
+
+| Face | Role |
+|---|---|
+| **Bevan** | Display slab — path names, screen titles. Carved-in-stone feel; never body copy |
+| **Karla** | Interface voice — buttons, prompts, captions |
+| **EB Garamond** | **Scripture only.** The one carryover from spec §9 |
+| **IBM Plex Mono** | References, small stamped labels, tallies |
+
+The serif/sans split is load-bearing: it separates *the app talking* from *the Bible talking*.
+
+> ⚠️ **Deviation.** The prototype loads fonts from the Google Fonts CDN
+> ([engrave.html:7-9](../prototype/engrave.html#L7-L9)). **Self-host them** — the app must work
+> offline. (The mockup artifact inlines them as base64 data URIs; that trick exists only to keep a
+> single mockup file portable and must **not** be copied into `src/`.)
+
+### 7.3 The stepping stone — the core component
+
+The most important new component; every path screen needs it. One irregular blob shape throughout:
+
+```css
+border-radius: 61% 39% 52% 48% / 46% 40% 60% 54%;
+```
+
+**Four states, driven by the two ladders in §3:**
+
+| State | Look | Condition |
+|---|---|---|
+| **Locked** | 76px dotted `--stone-line` outline, `opacity: .6`, `?` mark, no fill | `introducedAt === null` |
+| **Cracked** | 76px, fractured into **5 wedges**; each wedge is `--stone` until its text rung passes, then `--moss` | introduced, `stage < 5` |
+| **Mastered** | 72px **solid `--moss`**, whole, no mark | `stage === 5`, `refStage < 3` |
+| **Held** | 72px **solid `--waymark`**, whole, `✓` mark | `isHeld` — both ladders full |
+
+The cracked stone renders as **one element, not five**: a `conic-gradient` of five 72°-wedges whose
+colors come from five custom properties (`--p1`…`--p5`), over a `repeating-conic-gradient` hairline
+that draws the seams, plus the same `box-shadow` a solid stone uses so it reads as genuinely
+fractured and dimensional rather than a flat pie chart. No per-piece DOM node, no hand-placed
+coordinates — set `--p1..--p5` from `stage` and the shape follows.
+
+**Address progress is invisible.** The five pieces track the **text ladder only**. Nothing on screen
+reveals whether a verse is one or three address-rungs from gold.
+
+> **Design decision — the two ladders were nearly merged, and deliberately weren't.** Showing 5
+> text pips *and* 3 nested address pips was built and rejected as too complex. The considered
+> alternative was collapsing `stage` + `refStage` into a single 5-rung ladder where each rung tests
+> words and address together. That was rejected too: word-recall and address-recall are genuinely
+> different memory tasks that need to advance at their own rates — someone who knows the wording
+> cold but keeps blanking on the book would be forced to re-drill mastered word exercises just to
+> get more attempts at the address. **The data model keeps both ladders independent (§3); only the
+> display collapses to one shape.** Do not "simplify" `VerseProgress` by merging them.
+
+**Graduation is two quiet moments, not one.** All five pieces healed → the stone goes whole and
+**moss** (words mastered). Later, when the address ladder finishes, it shifts **moss → gold** and
+gains its mark. Both transitions cross-fade with a slight scale; the gold one adds a brief glow.
+Honour `prefers-reduced-motion` — under it, swap states with no scale or glow.
+
+### 7.4 Layout
+
+Mobile-first, single column, `max-width: 520px`. **Tap targets only.** Keep a visible
+`:focus-visible` outline.
+
+On the Pfad trail: stones are absolutely positioned along an SVG path, with the walked segment a
+solid `--moss` stroke and the rest a dotted `--trail-ahead`. Two rules keep labels from colliding —
+learned by getting both wrong first:
+
+1. **Every label sits centered directly below its own stone**, at `stoneY + stoneRadius + gap`.
+   Never beside a stone at a guessed offset, and never positioned relative to a neighbour's size.
+2. **Labels are opaque plaques** (`--surface` fill, hairline border, soft shadow), because the trail
+   line passes behind them; transparent text over the stroke is unreadable.
+
+Vertical spacing between stones is ~180px — enough for the tallest stone plus a two-line plaque.
+The primary "Los geht's" pill gets its own horizontal slot beside the current stone, never sharing
+vertical space with a plaque.
+
+**No visible session timer** anywhere in the chrome (§4.11).
+
+---
+
+## 8. Content
+
+Three paths, **17 memorization items** (some spanning a verse range — §4.8), all populated with
+verified Luther 1912 text supplied by the user. `docs/spec.md` §7 originally specified 11
+single-verse items; the Sabbath path was later replaced with a larger range-inclusive set.
+
+| Path id | Name | Items |
+|---|---|---|
+| `foundation` | Fundament | 1. Mose 1,1 · Johannes 1,1 · Römer 6,23 · 2. Timotheus 3,16 |
+| `sabbath` | Der Sabbat | 1. Mose 2,2–3 · 2. Mose 20,8–11 · 2. Mose 31,16–17 · 3. Mose 23,3 · Jesaja 58,13–14 · Jesaja 66,23 · Markus 2,27–28 · Lukas 4,16 · Hebräer 4,9 · 5. Mose 5,12–13 |
+| `death` | Was beim Tod geschieht | Prediger 9,5 · Prediger 12,7 · 1. Korinther 15,52 |
+
+**Verse text is never written from memory, generated, or paraphrased** — not even as a placeholder
+to be fixed later. Source exports are archived under `docs/` for provenance
+(`source-luther1912.html`, plus the Sabbath replacement's source) with a comment in
+`verses.de.ts` pointing at them.
+
+**Two doctrine paths were supplied and rejected: Baptism and Salvation.** Both exports were Luther
+**1984**, not 1912 — confirmed from the Logos export markup itself, which tags each inline verse
+link with its source resource (`;lutbib1984` vs `;lu1912`). Luther 1984 is copyright Deutsche
+Bibelgesellschaft; the files were deleted rather than added anywhere in the repo, per the rule
+below. Re-export both from Logos with the **Lutherbibel 1912** resource active (the same fix
+already applied once to the Sabbath path) to add them.
+
+**Licensing:** Luther 1912 and KJV are public domain. **Luther 1984 is copyright Deutsche
+Bibelgesellschaft** and must never be added, nor NIV, ESV, NLT or Schlachter 2000 — not one verse,
+not temporarily.
+
+---
+
+## 9. Tests
+
+Vitest. Written before implementation for `game/` and `srs/`, per `spec.md` §11 — they are pure
+functions with clean contracts. Components don't need the same treatment.
+
+**`tokenize` / `bare`** — punctuation stays attached; multiple spaces collapse; **ä ö ü ß survive**;
+`bare("„Väter\"")` → `Väter`.
+
+**`buildRound`** — window size honours `FRACTION`, `MIN_WINDOW` and `MAX_WINDOW`, **including
+rung 5**; a 31-word verse at rung 5 yields exactly 14; indices contiguous and in bounds; same
+`(id, seen)` reproduces byte-identically; window position varies across successive `seen`; a
+2-word verse doesn't crash.
+
+**`decoysFor`** — never returns a word from the target verse (case-insensitive); all longer than 3
+characters; returns exactly `DECOYS[stage]` when the pool allows; **returns fewer without throwing
+when the path holds one verse**; returns `[]` for `n = 0`.
+
+**`gradeText` / `gradeRef`** — advances one rung; floors at 2 and 1; ceilings at 5 and 3; due dates
+match the interval tables; `seen` increments on pass and on fail; a looked-up round moves no rung
+and sets `due = 0`.
+
+**`introduceNewVerses`** — introduces at most `settings.newPerDay`; a second call the same day
+introduces none; the next calendar day introduces the full quota again; stamps `introducedAt`;
+no-op when nothing is uninitialised; old `introductions` keys are pruned; **raising the setting
+mid-day makes the extra slots immediately available, and lowering it below today's count
+introduces none rather than throwing or un-introducing anything.**
+
+**`erosionStrip`** — stops before exceeding `EROSION_MAX_CHARS` and appends `…`; shows at least
+three words even when they are long compounds; a short verse shows in full with no ellipsis;
+the full/first-letter split follows the rung fractions.
+
+**`assembleQueue`** — excludes verses with `introducedAt === null`; `ref` only at `stage >= 2`;
+`aloud` only at `stage >= 3` and after 7 days; a verse can yield up to three items at once; the
+force flag ignores due dates.
+
+**`parseRef`** — `1. Mose 1,1`, `Johannes 3,16`, `1. Korinther 15,52`; throws on `Genesis 1:1`
+(colon), on missing verse, and on empty input. `formatRef(parseRef(x)) === x` for all book names.
+
+**`skeleton`** — reveals exactly `revealCount` words; keeps trailing punctuation;
+**umlaut-initial words show their letter, not `·`**.
+
+**`storage`** — round-trips a full `SaveData`; corrupt JSON degrades to defaults; a newer
+`schemaVersion` returns defaults **and leaves the stored value intact**.
+
+---
+
+## 10. Acceptance criteria
+
+- A session ends within one item of the five-minute mark, never mid-question, and with no visible
+  countdown, draining bar, or "last one" warning anywhere in the session UI (§4.11).
+- A missed verse returns later in the same session; a passed verse does not.
+- **Nachschlagen** visibly prevents advancement, and the verse returns the same day.
+- Progress survives a page reload, and a fresh profile introduces exactly 2 verses on day one.
+- Every control is reachable and tappable at 375 px wide.
+- The app works fully with the network disconnected.
+- `npm test` green; `npm run build` clean; no React import anywhere under `game/` or `srs/`.
+
+---
+
+## 11. Still open
+
+Nothing blocking. One item deliberately deferred:
+
+- **The retrieval gap left by cutting Deploy.** `spec.md` §6 called it *"the point of the whole
+  module"* — the only exercise testing whether a verse arrives when a real question prompts it,
+  rather than when the verse itself is the prompt. Deferred on purpose: use the app first, and
+  decide from experience whether the two ladders alone actually produce recall in conversation.
+  If they don't, the replacement should be **derived, not authored** — for example, showing one
+  verse from a path and asking which *other* verse in that path speaks to the same question.
+  Weaker than a real objection, but it keeps zero-authoring absolute.
+
+- **Where the erosion strip fits after the visual pivot.** `game/erosion.ts` (§5, tested in §9)
+  implements the word-decaying strip from `spec.md` §8, but the pilgrimage-trail redesign (§7)
+  replaced its Pfade-card role with the mini-trail preview above, and the Pfad screen's stone
+  previews use a plain quote snippet rather than eroding text. The function isn't wired to
+  anything in the new visual direction yet — decide whether it still has a home (e.g. an
+  expanded/detail view of a single stone) or whether it's now dead code once the trail UI is built.
+
+Resolved since first draft: the introduction cap is global and user-adjustable (§4.9); the erosion
+strip caps by character count rather than word count (§5).

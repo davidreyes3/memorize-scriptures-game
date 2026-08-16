@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($root=\"c:\\\\Users\\\\David\\\\OneDrive\\\\Developing\\\\memorize-scriptures-game\"; Get-ChildItem -Recurse -File $root | ForEach-Object { \"{0,5} lines  {1}\" -f \\(Get-Content $_.FullName | Measure-Object -Line\\).Lines, $_.FullName.Replace\\($root+'\\\\',''\\) })"
+    ]
+  }
+}
