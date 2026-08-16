@@ -164,13 +164,59 @@ gated globally and the number is user-adjustable.
 Use a scope prefix matching the folder: `game:`, `srs:`, `storage:`, `data:`, `ui:`, `docs:`,
 `chore:` (tooling, deps, config). Subject line under ~72 characters, no trailing period.
 
-**Write multi-line messages to a file and use `git commit -F <file>`.** Windows PowerShell 5.1
-mangles quotes when passing a here-string to a native executable, so `git commit -m @'...'@` fails
-the moment the message contains a double quote — it silently splits into bogus pathspecs. Put the
-message in a scratchpad file instead; it works every time.
+**Write multi-line messages to a file and use `git commit -F <file>`** — see Gotchas below.
 
 Skip the body only when the subject genuinely says everything (`chore: add .gitignore`). Anything
 involving a judgment call gets a body explaining the reasoning — future-you will not remember it.
+
+## Gotchas — read before debugging
+
+**When something breaks, don't just fix it.** Find the actual root cause, then add it here with
+the symptom, the cause, and the fix. A bug that cost time once should never cost it twice. If the
+same class of mistake shows up a third time, that's a signal the rule above it isn't strong enough
+— strengthen it rather than adding another entry.
+
+### JavaScript regex is ASCII-only. This project is German.
+
+**This has already caused three separate bugs.** `\w`, `\b`, `\d` and ranges like `[A-Za-z]` do
+**not** match `ä ö ü ß`. Worse, `\b` fails silently around them: in `"daß"`, the `ß` is not a word
+character, so `/\bdaß\b/` can never match anything, ever.
+
+- ❌ `word.replace(/[^A-Za-z']/g, "")` — deletes every umlaut
+- ❌ `/\bmuß\b/` — never matches
+- ✅ `word.replace(/[^\p{L}']/gu, "")` — Unicode property escape, needs the `u` flag
+- ✅ `/(?:daß|muß)/i` — plain alternation, no boundaries needed
+
+Rule: **any regex touching scripture text uses `\p{L}` with the `u` flag, or no character classes
+at all.** Reach for `\w` or `[A-Za-z]` in this codebase and you have almost certainly written a bug.
+
+### PowerShell mangles quotes passed to native executables
+
+`git commit -m @'...'@` breaks apart the moment the message contains a double quote, producing
+baffling `pathspec ... did not match any file(s)` errors rather than a clear failure. Write the
+message to a scratchpad file and use `git commit -F <file>`.
+
+### PowerShell's `Get-Content -Raw` corrupts UTF-8 by default
+
+It falls back to the system codepage, silently turning `ä ö ü ß` and curly quotes into mojibake
+(`Ã¶`, `â€ž`). This mangled every German string in a generated file once. Always pass the encoding
+explicitly on **both** sides:
+
+```powershell
+Get-Content $path -Raw -Encoding UTF8
+[IO.File]::WriteAllText($path, $text, (New-Object System.Text.UTF8Encoding($false)))
+```
+
+### PowerShell reports native stderr as a failure
+
+`git push` writes normal progress to stderr, so PowerShell wraps it in a `NativeCommandError` and
+the tool reports exit 1 even when the command fully succeeded. **Read the actual output before
+concluding something failed** — check for `git status -sb` agreement rather than trusting the exit
+code.
+
+### Neither Node nor git is on PATH
+
+See *Running anything* above. Applies to every single shell call; it does not persist.
 
 ## Verification
 
