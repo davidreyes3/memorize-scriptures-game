@@ -58,10 +58,19 @@ that includes self-hosted fonts. State lives in `localStorage` and nowhere else.
 
 ## Stack
 
-- **React** — the UI is a small state machine over screens; components keep that legible.
-- **Vite** — instant dev server, no config to learn.
-- **TypeScript** — the rung ladders are the kind of thing types catch mistakes in early.
-- **Vitest** — pure logic is where the bugs would hide, so it gets real tests.
+Every runtime and dev dependency in `package.json`, and why it's there. **Ask before adding a
+dependency** (see Hard rules) — and when one is approved, add its row here in the same commit.
+
+| Package | Why |
+|---|---|
+| `react`, `react-dom` | The UI is a small state machine over screens; components keep that legible. |
+| `vite` | Instant dev server, no config to learn. Also the production bundler — it's what fingerprints and locally emits the self-hosted fonts below, so there's no CDN call at runtime. |
+| `typescript` | The rung ladders (`stage`/`refStage`) are the kind of thing types catch mistakes in early. |
+| `vitest` | Pure logic is where the bugs would hide, so it gets real tests. |
+| `@vitejs/plugin-react` | Vite's official plugin for JSX transform and Fast Refresh. |
+| `@types/react`, `@types/react-dom` | Type declarations for React/ReactDOM — neither ships its own. |
+| `@types/node` | Type declarations for `node:fs`/`node:path`/`process`, needed only by `licensing.test.ts` (the local, dev-only Logos-export copyright screen — see *Scripture licensing and git history* below). |
+| `@fontsource/bevan`, `@fontsource/karla`, `@fontsource/eb-garamond`, `@fontsource/ibm-plex-mono` | Self-hosted `.woff2`/`.woff` files for the four faces in `build.md` §7.2, bundled locally instead of loaded from the Google Fonts CDN — required by the no-network-calls-at-runtime rule. |
 
 ## Structure
 
