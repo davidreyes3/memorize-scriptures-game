@@ -3,7 +3,7 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-16 (visual foundation landed).
+Last updated: 2026-08-17 (address ladder cut; visual foundation landed). Pushed through `e6182a7`.
 
 ---
 
@@ -14,7 +14,7 @@ Last updated: 2026-08-16 (visual foundation landed).
 reversal), `docs/build.md` (the implementation spec, incl. the finalized visual system in §7).
 
 **Project scaffold** — Vite + React + TypeScript + Vitest. `npm install`, `npm test`,
-`npm run build`, and `npm run dev` all work. Fonts are **not** self-hosted yet.
+`npm run build`, and `npm run dev` all work.
 
 **Content** (`src/data/`) — 17 memorization items across 3 paths, all verified Luther 1912 supplied
 by the user, with source exports archived in `docs/` for provenance. German path names and blurbs
@@ -31,16 +31,26 @@ injected, importing nothing from React:
 | `game/round.ts` | `buildRound`, `decoysFor` |
 | `game/reference.ts` | `parseRef`, `formatRef`, `nearNumbers` — incl. verse ranges |
 | `game/erosion.ts` | `erosionStrip` — ⚠️ see loose ends |
-| `srs/grading.ts` | `gradeText`, `gradeRef`, look-up + aloud marking |
+| `srs/grading.ts` | `gradeText`, look-up + aloud marking — **no `gradeRef`**, see below |
 | `srs/introduction.ts` | `introduceNewVerses` — the per-day cap |
-| `srs/queue.ts` | `assembleQueue`, `isHeld` |
+| `srs/queue.ts` | `assembleQueue`, `isHeld(progress: { stage })` |
 | `srs/session.ts` | `timeLeft`, `isOverrun` — pure clock arithmetic only |
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**130 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen.
+**127 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen.
 `npm run build` type-checks clean (`@types/node` added as a dev dependency to fix `licensing.test.ts`'s
 use of `node:fs`/`node:path`, which `tsc` couldn't resolve without it).
+
+**The address track lost its ladder** (`e6182a7`, following the docs commit `45f89be`). Gating the
+stone's gold graduation on a second `refStage`/`refDue` ladder meant a forgotten book name could
+hold a verse just short of mastery indefinitely — cut. The address question (Erkennen/Zuordnen/
+Bilden, picked at random) now rides along with text review as a single ungated prompt: right or
+wrong, it never touches `stage`; a miss just requeues it later in the same session. `isHeld` /
+"held" now means `stage === 5` alone. `SCHEMA_VERSION` bumped to 2 — `storage/` already discards
+any save with a mismatched version, so this needed no migration code, and there's no real user
+data yet to lose. Full reasoning: `build.md` §7.3's design-decision callout, and `CLAUDE.md`'s
+"the address question never gates the stone" hard rule.
 
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
@@ -61,8 +71,23 @@ known 1984 wordings, so stripping the tags doesn't get past it.
 
 Roughly in dependency order.
 
-1. **The stepping-stone component** (`build.md` §7.3) — four states, the 5-wedge cracked stone, the
-   two-stage graduation. The single most important new component; build it first and in isolation.
+1. **The stepping-stone component** (`build.md` §7.3) — **planned, not started.** Three states now
+   (locked / cracked / held-gold — the address-ladder cut above dropped the old "mastered" moss
+   state and its second graduation), the 5-wedge cracked stone, one graduation. The single most
+   important new component; build it first and in isolation. Agreed plan, pick up here:
+   - `src/game/stone.ts` — pure `stoneState(progress)`, **test written first** in
+     `stone.test.ts`. Cases: locked wins regardless of `stage`; `healed = stage - 1` for
+     `stage` 1–4 (cracked); held at `stage === 5`.
+   - `src/components/SteppingStone.tsx` + `.css` — one element, `conic-gradient` over
+     `repeating-conic-gradient` for the wedge seams, `--p1`…`--p5` driven by `healed`. The
+     cracked layer lives on a `::before` (background-image can't be transitioned) so it can
+     cross-fade to 0 opacity for graduation while the base element's size shifts 76px→72px.
+     `prefers-reduced-motion` swaps states instantly, no scale/glow.
+   - Temporary gallery in `App.tsx` showing every state side by side, plus a button to walk
+     one stone up the ladder and watch graduation animate — scaffolding, not a real screen.
+   - `game/stone.ts` stretches `game/`'s stated scope slightly (presentation-derived, not game
+     mechanics) — chosen deliberately to keep it pure/testable; note this in CLAUDE.md's
+     Structure section when it lands.
 2. **The session controller** — the stateful layer wiring pure `game/`/`srs/` functions to React:
    current screen, active queue, round in progress, the invisible five-minute clock and its
    "serve exactly one more item, then stop" rule (§4.11). This is the only genuinely new *logic*
@@ -77,11 +102,11 @@ Roughly in dependency order.
 
 ## Loose ends and risks
 
-- **No GitHub remote configured yet.** The repo is local-only, so there's still no offsite backup.
-  A GitHub repository exists but its URL hasn't been wired up, and **its public/private status is
-  unconfirmed** — worth checking before the first push, since that decides whether an accidental
-  copyrighted-verse commit would be a public distribution. Commit identity is set repo-locally to
-  a GitHub noreply address, so the real email stays out of history either way.
+- **GitHub remote is configured and pushed to** (`origin` → `davidreyes3/memorize-scriptures-game`,
+  up to date through `e6182a7`). An unauthenticated API check returned 404, which is how GitHub
+  hides private repos from the public — so it's **likely private**, but that was inferred, not
+  confirmed directly on github.com. Worth a quick look there before it matters. Commit identity is
+  set repo-locally to a GitHub noreply address, so the real email stays out of history either way.
 - **`game/erosion.ts` may be dead code.** It implements `spec.md` §8's word-decaying strip, is
   fully tested, but the trail redesign gave its Pfade-card job to the 3-dot mini-trail, and stone
   plaques use a plain quote snippet instead. Decide whether it has a home (a single-stone detail
