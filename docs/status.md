@@ -36,9 +36,16 @@ injected, importing nothing from React:
 | `srs/queue.ts` | `assembleQueue`, `isHeld` |
 | `srs/session.ts` | `timeLeft`, `isOverrun` — pure clock arithmetic only |
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
+| `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**83 tests passing**, covering every case enumerated in `build.md` §9. `npm run build` type-checks
-clean.
+**130 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen.
+`npm run build` type-checks clean.
+
+**Copyright screening is automated.** `npm test` fails if any shipped verse carries markers of a
+copyrighted translation, and also screens any Logos export sitting in `docs/` locally — so a bad
+export trips the suite before its text can be ingested. It matches provenance tags loosely
+(`lu84`, `lut84`, `lutbib1984`, `LUT2017`, …) *and* the text itself via reformed spellings and
+known 1984 wordings, so stripping the tags doesn't get past it.
 
 ---
 
