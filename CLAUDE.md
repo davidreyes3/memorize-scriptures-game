@@ -164,6 +164,11 @@ gated globally and the number is user-adjustable.
 Use a scope prefix matching the folder: `game:`, `srs:`, `storage:`, `data:`, `ui:`, `docs:`,
 `chore:` (tooling, deps, config). Subject line under ~72 characters, no trailing period.
 
+**Write multi-line messages to a file and use `git commit -F <file>`.** Windows PowerShell 5.1
+mangles quotes when passing a here-string to a native executable, so `git commit -m @'...'@` fails
+the moment the message contains a double quote — it silently splits into bogus pathspecs. Put the
+message in a scratchpad file instead; it works every time.
+
 Skip the body only when the subject genuinely says everything (`chore: add .gitignore`). Anything
 involving a judgment call gets a body explaining the reasoning — future-you will not remember it.
 
