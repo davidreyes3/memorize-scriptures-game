@@ -1,13 +1,16 @@
-// The seven Sitzung exercise bodies (docs/build.md §6, §4.3-§4.8). Each is presentation
-// over the pure game/ builders — buildRound, windowedSkeleton, parseRef/nearNumbers —
-// called fresh on every render rather than memoized, since they're already deterministic
-// on (verse.id, seen) and cheap at this data size.
+// The exercise bodies (docs/build.md §6, §4.3-§4.8). Each is presentation over the pure
+// game/ builders — buildRound, parseRef/nearNumbers — called fresh on every render
+// rather than memoized, since they're already deterministic on (verse.id, seen) and
+// cheap at this data size.
+//
+// Rung 5 (Kalt) reuses ClozeBody rather than a separate skeleton/tap-in-order exercise —
+// the first-letter skeleton and forced tap ordering were cut after user feedback found
+// them more annoying than useful.
 import { useEffect, useState } from "react";
 import { de } from "../i18n/de";
 import { BOOKS_DE } from "../data/books.de";
 import type { Verse, VerseProgress } from "../game/types";
 import { buildRound } from "../game/round";
-import { windowedSkeleton } from "../game/text";
 import { formatRef, nearNumbers, parseRef, type RefParts } from "../game/reference";
 import { hashSeed, mulberry32, shuffle } from "../game/random";
 import "./exercises.css";
@@ -103,71 +106,6 @@ export function ClozeBody({ verse, progress, allVerses, onAnswer }: BodyProps) {
             </button>
           </div>
         </>
-      ) : (
-        <VerdictAndContinue ok={verdict} onAnswer={onAnswer} />
-      )}
-    </div>
-  );
-}
-
-export function KaltBody({ verse, progress, allVerses, onAnswer }: BodyProps) {
-  const round = buildRound(verse, progress.stage, progress.seen, allVerses);
-  const [placed, setPlaced] = useState<number[]>([]);
-  const [slips, setSlips] = useState(0);
-  const [wrongTile, setWrongTile] = useState<number | null>(null);
-  const [verdict, setVerdict] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    setPlaced([]);
-    setSlips(0);
-    setWrongTile(null);
-    setVerdict(null);
-  }, [verse.id, progress.seen]);
-
-  const used = new Set(placed);
-  const nextIndex = placed.length;
-
-  const tap = (bankIndex: number) => {
-    if (verdict !== null || nextIndex >= round.window.length || used.has(bankIndex)) return;
-    const expected = round.tokens[round.window[nextIndex]];
-    if (round.bank[bankIndex] === expected) {
-      const next = [...placed, bankIndex];
-      setPlaced(next);
-      if (next.length === round.window.length) setVerdict(slips <= 1);
-    } else {
-      setSlips((s) => s + 1);
-      setWrongTile(bankIndex);
-      setTimeout(() => setWrongTile((w) => (w === bankIndex ? null : w)), 350);
-    }
-  };
-
-  const skel = windowedSkeleton(round.tokens, round.window);
-  let k = 0;
-  const display = round.tokens.map((tok, i) => {
-    if (!round.window.includes(i)) return tok;
-    const filled = k < placed.length;
-    const word = filled ? round.bank[placed[k]] : skel[i].display;
-    k++;
-    return word;
-  });
-
-  return (
-    <div>
-      <p className="scripture-text">{display.join(" ")}</p>
-
-      {verdict === null ? (
-        <div className="tile-bank">
-          {round.bank.map((word, i) => (
-            <button
-              key={i}
-              className={`tile${used.has(i) ? " used" : ""}${wrongTile === i ? " wrong" : ""}`}
-              disabled={used.has(i)}
-              onClick={() => tap(i)}
-            >
-              {word}
-            </button>
-          ))}
-        </div>
       ) : (
         <VerdictAndContinue ok={verdict} onAnswer={onAnswer} />
       )}

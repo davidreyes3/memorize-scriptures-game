@@ -4,7 +4,7 @@
 import { de } from "../i18n/de";
 import type { ActiveItem, SessionState } from "../session/controller";
 import type { Verse, VerseProgress } from "../game/types";
-import { AloudBody, BildenBody, ClozeBody, ErkennenBody, KaltBody, LesenBody, ZuordnenBody } from "./exercises";
+import { AloudBody, BildenBody, ClozeBody, ErkennenBody, LesenBody, ZuordnenBody } from "./exercises";
 import "./Sitzung.css";
 
 interface SitzungProps {
@@ -62,7 +62,6 @@ function renderBody(
 
   if (current.kind === "text") {
     if (progress.stage === 1) return <LesenBody verse={verse} progress={progress} allVerses={verses} onAnswer={onAnswer} />;
-    if (progress.stage === 5) return <KaltBody verse={verse} progress={progress} allVerses={verses} onAnswer={onAnswer} />;
     return <ClozeBody verse={verse} progress={progress} allVerses={verses} onAnswer={onAnswer} />;
   }
 
