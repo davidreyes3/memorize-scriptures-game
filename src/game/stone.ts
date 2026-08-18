@@ -11,5 +11,8 @@ export type StoneState =
 export function stoneState(progress: Pick<VerseProgress, "stage" | "introducedAt">): StoneState {
   if (progress.introducedAt === null) return { state: "locked" };
   if (progress.stage === 5) return { state: "held" };
-  return { state: "cracked", healed: progress.stage - 1 };
+  // healed = stage, not stage - 1: the wedge count runs 1..4 while cracked, so the
+  // last visible crack heals in the same moment the stone turns whole and gold,
+  // rather than two wedges healing invisibly at once on the jump to held.
+  return { state: "cracked", healed: progress.stage };
 }
