@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (session controller landed). Pushed through `e6182a7`; nine more commits
-sit on top locally, not yet pushed (`33c5c18`..`335256f`).
+Last updated: 2026-08-18 (v1 — all four screens landed, app is playable end to end). Pushed through
+`e6182a7`; eleven more commits sit on top locally, not yet pushed (`33c5c18`..`0629ad8`).
 
 ---
 
@@ -28,7 +28,7 @@ injected, importing nothing from React:
 |---|---|
 | `game/types.ts` | all types + constants + `blankProgress` / `createSaveData` |
 | `game/random.ts` | `hashSeed`, `mulberry32`, `shuffle` — deterministic seeding |
-| `game/text.ts` | `tokenize`, `bare`, `skeleton` — Unicode-aware |
+| `game/text.ts` | `tokenize`, `bare`, `skeleton`, `windowedSkeleton` — Unicode-aware |
 | `game/round.ts` | `buildRound`, `decoysFor` |
 | `game/reference.ts` | `parseRef`, `formatRef`, `nearNumbers` — incl. verse ranges |
 | `game/erosion.ts` | `erosionStrip` — ⚠️ see loose ends |
@@ -70,9 +70,8 @@ pulse (`stone-seal` keyframe) — for 600ms before the existing gold cross-fade 
 no backing `stage` value (there isn't a 6th rung to spare); it's inserted at the component level
 via a `useState`/`useEffect` pair watching for that one edge, and skipped entirely under
 `prefers-reduced-motion`. `stoneState` itself stays a pure 3-state function — see `CLAUDE.md`'s
-Structure section for why the split lands there. A temporary gallery lives in `App.tsx`
-(`StoneGallery`) showing every state plus a "watch it climb" button — scaffolding, remove once the
-real Pfad trail exists.
+Structure section for why the split lands there. Now rendered for real on the Pfad trail
+(`PfadScreen.tsx`) rather than the old `App.tsx` gallery, which is gone.
 
 **The session controller** (`build.md` §4.9–4.11, §6) — `src/session/controller.ts`'s pure
 `reduce(state, action)` (test-first, 16 cases in `controller.test.ts`) plus the thin
@@ -91,10 +90,38 @@ real Pfad trail exists.
 
 Session summary stats (`answered`, `firstTimeCorrect`, `rungsClimbed`, `held`) are computed by a
 separate `summarize()` from a plain attempts log at session end, kept apart from the per-action
-transition logic so each stays simple and independently testable. A temporary `SessionDebug` view
-in `App.tsx` drives the whole reducer — pick a path, start a session, grade items, watch the
-summary land — same scaffolding pattern as `StoneGallery`, and the real place `SteppingStone` and
-this controller meet is the Pfad/Sitzung screens, not yet built.
+transition logic so each stays simple and independently testable. `summary.timeMs` (elapsed session
+time) was added once `ZusammenfassungScreen` needed it — the one place elapsed time is ever shown,
+since it's after the session ends, never during it (§4.11). `SET_NEW_PER_DAY` and `HYDRATE` (used
+for a full progress reset) round out the action set for the Pfade screen's settings.
+
+**The four screens** (`build.md` §6) — `PfadeScreen`, `PfadScreen`, `Sitzung` (+ `exercises.tsx`
+for the seven bodies), `ZusammenfassungScreen`, wired together in `App.tsx` by `screen` alone —
+this is v1: the app is playable end to end, `npm run dev` and pick a path. No new logic landed
+here; every screen is presentation over what `session/controller.ts` and `game/`/`srs/` already do.
+
+- **Sitzung's graded bodies hold a local verdict before dispatching.** The controller advances
+  `current` the instant `answer()`/`lookup()` is called, but the spec wants a verdict block *before*
+  advancing — so cloze/Kalt/Erkennen/Zuordnen/Bilden compute correctness themselves (comparing
+  against `buildRound`'s window or `parseRef`'s parts), show right/wrong locally, and only call
+  `onAnswer` once the user taps *Weiter*. `Lesen` and *Aloud* skip this — they're explicitly
+  "not graded," so tapping the one button advances immediately.
+- **Kalt reuses `windowedSkeleton`** (new — see below) instead of `skeleton`, since its window can
+  land anywhere in a long verse, not just as a prefix.
+- **The address-`Bilden`/`Erkennen` decoy addresses use `nearNumbers` on chapter and verse**,
+  combined with the verse's own book; `Zuordnen`'s decoy texts are three other verses picked at
+  random via the same seeded-`rng`-per-item pattern everything else here uses
+  (`hashSeed(verse.id, seen, salt)`), so a body's options are stable across re-renders without
+  memoization.
+- **Two bugs were found by actually running the app** (Playwright against the dev server, not just
+  `tsc`/`vitest`) and are fixed, not just noted: `PfadeScreen`/`PfadScreen` were computing "ready"
+  from the queue *before* `introduceNewVerses` ran, so a first-time visit always read "Alles
+  erledigt" instead of "Los geht's" — both now project `introduceNewVerses` first, same as
+  `START_SESSION` will actually do. And the trail's stones were positioned with raw pixel
+  `left`/`top` matching the SVG `viewBox`'s units, which only lined up with the drawn path at
+  exactly 520px — narrower phones cut plaques off past the edge. Fixed by moving to a 0–100
+  abstract x-axis (`preserveAspectRatio="none"` on the SVG, `left: X%` on the stone divs), so the
+  two always agree at any width.
 
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
@@ -113,23 +140,31 @@ known 1984 wordings, so stripping the tags doesn't get past it.
 
 ## Not built yet
 
-Roughly in dependency order.
+Everything load-bearing from `build.md` is now built. What's left is refinement, not new features:
 
-1. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
-   variants), Zusammenfassung. Sitzung is by far the biggest — it needs `buildRound`, `decoysFor`,
-   `skeleton`, and `parseRef`/`formatRef`/`nearNumbers` wired to `useSession`'s current item to
-   actually render the seven exercise bodies, none of which the controller builds itself. Pfad is
-   where `SteppingStone` gets a real home, replacing the temporary `App.tsx` gallery; the debug
-   view's buttons (`Richtig`/`Falsch`/`Nachschlagen`/`Gesagt`/`Beenden`) map directly to
-   `useSession`'s existing `answer`/`lookup`/`aloudDone`/`endSession` actions, so the screens are
-   presentation on top of what's already wired, not new logic.
-2. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
-   screens get built, so a second locale stays possible.
+1. **Visual polish pass against `build.md` §7 in the browser.** The four screens use the real
+   tokens/fonts and are functionally complete and verified end to end (see below), but haven't had
+   a dedicated design pass — spacing, the verdict-block treatment, and the trail's curve are all
+   "reasonable v1," not checked against the mockup artifact referenced in §7.
+2. **`window.confirm`/`window.alert`** are used for the reset confirmation (`PfadeScreen`) — fine
+   functionally, but a native browser dialog rather than an in-app one; revisit if it looks out of
+   place next to everything else.
+3. Everything in *Loose ends and risks* below.
 
 ---
 
 ## Loose ends and risks
 
+- **`src/i18n/de.ts`'s UI copy (button labels, prompts, stat labels) was written for v1 and hasn't
+  had a native-speaker pass** — it's plain, direct German, not reviewed for tone or naturalness the
+  way the path names/blurbs and scripture text have been. Worth a look before this is shown to
+  anyone.
+- **End-to-end verification of this pass was an ad hoc Playwright script run against the dev
+  server, not a committed test.** It drove all four screens and all seven exercise bodies (seeding
+  `localStorage` directly to reach every rung without waiting on real spaced-repetition scheduling)
+  at 320/375/520px, confirmed no console errors, and is what caught the two bugs described above.
+  The script itself wasn't kept — `npm test` covers the logic layer; the screens have no automated
+  test of their own yet.
 - **GitHub remote is configured and pushed to** (`origin` → `davidreyes3/memorize-scriptures-game`,
   up to date through `e6182a7`). An unauthenticated API check returned 404, which is how GitHub
   hides private repos from the public — so it's **likely private**, but that was inferred, not
