@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (v1, then two rounds of user-feedback fixes). Pushed through `e6182a7`;
-fifteen more commits sit on top locally, not yet pushed (`33c5c18`..`c6334d9`).
+Last updated: 2026-08-18 (v1, then three rounds of user-feedback fixes). Pushed through `e6182a7`;
+twenty more commits sit on top locally, not yet pushed (`33c5c18`..`265558d`).
 
 ---
 
@@ -33,13 +33,13 @@ injected, importing nothing from React:
 | `game/reference.ts` | `parseRef`, `formatRef`, `nearNumbers` — incl. verse ranges |
 | `game/erosion.ts` | `erosionStrip` — ⚠️ see loose ends |
 | `srs/grading.ts` | `gradeText`, look-up + aloud marking — **no `gradeRef`**, see below |
-| `srs/introduction.ts` | `introduceNewVerses` — per-day cap **and** one-verse-at-a-time unlocking per path |
+| `srs/introduction.ts` | `introduceNewVerses` — one-verse-at-a-time unlocking per path; no daily cap |
 | `srs/queue.ts` | `assembleQueue`, `isHeld(progress: { stage })` |
 | `srs/session.ts` | `timeLeft`, `isOverrun` — pure clock arithmetic only |
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**148 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
+**146 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
 the stepping stone, and the session controller. `npm run build` type-checks clean (`@types/node`
 added as a dev dependency to fix `licensing.test.ts`'s use of `node:fs`/`node:path`, which `tsc`
 couldn't resolve without it).
@@ -120,9 +120,15 @@ here; every screen is presentation over what `session/controller.ts` and `game/`
 - **Verses now unlock one at a time within a path** (`srs/introduction.ts`) — a verse is only
   introducible once the one before it in its path is held, not just "up to `newPerDay` in
   declaration order" as originally built. This is a gate on introduction only; once introduced a
-  verse stays introduced regardless of later review outcomes, and the daily `newPerDay` cap still
-  applies on top, now spread across however many paths currently have an eligible candidate. See
-  `introduction.test.ts` for the unlock-on-mastery / paths-unlock-independently cases.
+  verse stays introduced regardless of later review outcomes. See `introduction.test.ts` for the
+  unlock-on-mastery / paths-unlock-independently cases.
+- **The daily `newPerDay` cap is gone entirely, not just its UI.** Once unlocking became
+  sequential, the user pointed out it had nothing left to bound — you already can't get more than
+  one verse "in flight" per path, and tapping the next stone whenever you want to keep going is
+  already the right pace. `settings`/`introductions` are gone from `SaveData` (`SCHEMA_VERSION`
+  bumped to 3, no migration needed — see `storage/`'s existing "unknown version degrades to
+  defaults" rule), and `introduceNewVerses` just introduces every currently-eligible candidate on
+  every call. `PfadeScreen`'s stepper and `capReached` messaging are gone with it.
 - **`Trotzdem üben` is gone.** With unlocking sequential, the held verses in a path always form a
   prefix, so there's always at most one "active" stone — that stone is now the tap target itself
   (`PfadScreen`, pulses gently via `trail-stone-active`), starting a session with no way to force
@@ -140,9 +146,8 @@ here; every screen is presentation over what `session/controller.ts` and `game/`
   two always agree at any width.
 - **What looked like a third bug — "it never gets past the same scriptures" — was the daily
   `newPerDay` cap plus `Trotzdem üben`** re-serving already-held verses with no signal explaining
-  why nothing new appeared. Sequential unlocking plus removing `Trotzdem üben` (above) addresses
-  this directly; `PfadScreen`'s `capReached` hint (added in the previous round) still covers the
-  remaining case where the *next* eligible verse exists but today's `newPerDay` quota is spent.
+  why nothing new appeared. Fully resolved now: sequential unlocking, no `Trotzdem üben`, and no
+  daily cap left to hit in the first place.
 
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
