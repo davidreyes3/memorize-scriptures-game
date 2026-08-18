@@ -52,7 +52,12 @@ export function createSaveData(verses: readonly Verse[]): SaveData {
 export const FRACTION: readonly number[] = [0, 0, 0.3, 0.6, 1, 1];
 export const DECOYS: readonly number[] = [0, 0, 0, 1, 2, 3];
 export const INTERVALS: readonly number[] = [0, 1, 2, 4, 9, 21];
-export const MAX_WINDOW = 14;
+// Indexed by stage, like FRACTION/DECOYS/INTERVALS — a *per-stage* ceiling, not one global
+// cap. A single MAX_WINDOW=14 meant any verse over ~47 words hit the same ceiling from stage
+// 2 onward, flattening FRACTION's ramp: the first cloze was already as hard as the last one.
+// Kalt (5) keeps the original 14 — that number was chosen for mobile tap-count reasons
+// (build.md §4.6), not touched here.
+export const MAX_WINDOW: readonly number[] = [0, 0, 6, 9, 12, 14];
 export const MIN_WINDOW = 3;
 export const SESSION_MS = 300_000;
 export const DAY_MS = 86_400_000;

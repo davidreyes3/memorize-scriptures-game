@@ -19,12 +19,13 @@ export interface Round {
  * when `room+1` shares a small factor with 5.
  *
  * ⚠️ Also per the long-verse decision (docs/build.md §4.6, resolves spec.md §10.1),
- * MAX_WINDOW now applies at rung 5 (Kalt) too, not just rung 4.
+ * MAX_WINDOW now applies at rung 5 (Kalt) too, not just rung 4 — though as of the per-stage
+ * cap below, "MAX_WINDOW" at each rung is its own ceiling, not one shared number.
  */
 export function buildRound(verse: Verse, stage: TextRung, seen: number, allVerses: readonly Verse[]): Round {
   const tokens = tokenize(verse.text);
   const len = tokens.length;
-  const n = Math.min(len, MAX_WINDOW, Math.max(MIN_WINDOW, Math.round(len * FRACTION[stage])));
+  const n = Math.min(len, MAX_WINDOW[stage], Math.max(MIN_WINDOW, Math.round(len * FRACTION[stage])));
   const room = len - n;
 
   const windowRng = mulberry32(hashSeed(verse.id, seen, "window"));

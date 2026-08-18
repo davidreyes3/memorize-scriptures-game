@@ -13,12 +13,22 @@ describe("buildRound", () => {
     expect(round.window.length).toBe(expected);
   });
 
-  it("caps at MAX_WINDOW, including at rung 5 (the long-verse decision)", () => {
-    const verse = verseById("f5"); // 31 words — well over MAX_WINDOW
+  it("caps at MAX_WINDOW[stage], including at rung 5 (the long-verse decision)", () => {
+    const verse = verseById("f5"); // 31 words — well over every stage's cap
     const r4 = buildRound(verse, 4, 0, FIXTURE_VERSES);
     const r5 = buildRound(verse, 5, 0, FIXTURE_VERSES);
-    expect(r4.window.length).toBe(MAX_WINDOW);
-    expect(r5.window.length).toBe(MAX_WINDOW);
+    expect(r4.window.length).toBe(MAX_WINDOW[4]);
+    expect(r5.window.length).toBe(MAX_WINDOW[5]);
+  });
+
+  it("keeps a real difficulty ramp across stages on a long verse", () => {
+    // Regression: a single global MAX_WINDOW made any verse longer than ~47 words show the
+    // same maximum window from stage 2 onward, flattening the ramp FRACTION was meant to
+    // create — the very first cloze exercise was already as hard as the last one.
+    const verse = verseById("f5"); // 31 words
+    const windows = ([2, 3, 4, 5] as const).map((stage) => buildRound(verse, stage, 0, FIXTURE_VERSES).window.length);
+    expect(windows).toEqual([...windows].sort((a, b) => a - b));
+    expect(new Set(windows).size).toBe(4); // strictly increasing, no two stages tie
   });
 
   it("produces contiguous, in-bounds indices", () => {
