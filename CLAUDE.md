@@ -93,6 +93,14 @@ functions over plain data, with `now` and `rng` passed in rather than called ins
 most important structural rule in the project — it is what makes the logic testable, and
 `build.md` §9 specifies the tests. `storage/` is the only module allowed to touch `localStorage`.
 
+`game/stone.ts` is a deliberate, narrow exception: `stoneState(progress)` is presentation-derived
+(it maps `stage`/`introducedAt` to the stepping stone's locked/cracked/held visual, `build.md`
+§7.3) rather than game mechanics, but it stays in `game/` — pure, `now`/`rng`-free, test-first —
+because that purity is what made the wedge-healing bug (`stone.test.ts`) easy to catch and fix.
+Transient animation *timing* (the sealing pulse before graduation) lives in
+`components/SteppingStone.tsx` instead, since it's genuinely component-only concern with no
+derivation from `progress` at all.
+
 Write the failing test first for anything in `game/` or `srs/`. Components don't need that.
 
 ## Porting gotchas

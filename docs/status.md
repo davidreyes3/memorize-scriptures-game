@@ -3,7 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-17 (address ladder cut; visual foundation landed). Pushed through `e6182a7`.
+Last updated: 2026-08-18 (stepping-stone component landed). Pushed through `e6182a7`; five more
+commits sit on top locally, not yet pushed (`33c5c18`..`f18581f`).
 
 ---
 
@@ -52,6 +53,26 @@ any save with a mismatched version, so this needed no migration code, and there'
 data yet to lose. Full reasoning: `build.md` §7.3's design-decision callout, and `CLAUDE.md`'s
 "the address question never gates the stone" hard rule.
 
+**The stepping stone** (`build.md` §7.3) — `src/game/stone.ts`'s pure `stoneState(progress)`
+(test-first, `stone.test.ts`) plus `src/components/SteppingStone.tsx`/`.css`. Three states off
+`stage`/`introducedAt` alone: locked (dotted outline, `?`), cracked (one element, a
+`conic-gradient` of 5 wedges over a `repeating-conic-gradient` seam layer, `--p1`…`--p5` driven by
+a `healed` count), held (72px solid gold, `✓`). One design correction along the way: `healed` is
+`stage`, not `stage - 1` — the original formula only ever reached 3-of-5 healed at the last cracked
+stage, so reaching held silently healed *two* wedges (4 and 5) in the same instant it turned gold,
+which read as a jump rather than a completion. `healed = stage` reaches 4-of-5, leaving exactly one
+crack for graduation to close.
+
+Graduation itself is two beats, not one: `SteppingStone` detects the cracked→held transition and
+holds a transient "sealing" frame — all 5 wedges mended, still not gold, with a small breathing
+pulse (`stone-seal` keyframe) — for 600ms before the existing gold cross-fade plays. This frame has
+no backing `stage` value (there isn't a 6th rung to spare); it's inserted at the component level
+via a `useState`/`useEffect` pair watching for that one edge, and skipped entirely under
+`prefers-reduced-motion`. `stoneState` itself stays a pure 3-state function — see `CLAUDE.md`'s
+Structure section for why the split lands there. A temporary gallery lives in `App.tsx`
+(`StoneGallery`) showing every state plus a "watch it climb" button — scaffolding, remove once the
+real Pfad trail exists.
+
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
 override) plus four `--font-*` variables. The four faces (Bevan, Karla, EB Garamond, IBM Plex Mono)
@@ -71,32 +92,15 @@ known 1984 wordings, so stripping the tags doesn't get past it.
 
 Roughly in dependency order.
 
-1. **The stepping-stone component** (`build.md` §7.3) — **planned, not started.** Three states now
-   (locked / cracked / held-gold — the address-ladder cut above dropped the old "mastered" moss
-   state and its second graduation), the 5-wedge cracked stone, one graduation. The single most
-   important new component; build it first and in isolation. Agreed plan, pick up here:
-   - `src/game/stone.ts` — pure `stoneState(progress)`, **test written first** in
-     `stone.test.ts`. Cases: locked wins regardless of `stage`; `healed = stage - 1` for
-     `stage` 1–4 (cracked); held at `stage === 5`.
-   - `src/components/SteppingStone.tsx` + `.css` — one element, `conic-gradient` over
-     `repeating-conic-gradient` for the wedge seams, `--p1`…`--p5` driven by `healed`. The
-     cracked layer lives on a `::before` (background-image can't be transitioned) so it can
-     cross-fade to 0 opacity for graduation while the base element's size shifts 76px→72px.
-     `prefers-reduced-motion` swaps states instantly, no scale/glow.
-   - Temporary gallery in `App.tsx` showing every state side by side, plus a button to walk
-     one stone up the ladder and watch graduation animate — scaffolding, not a real screen.
-   - `game/stone.ts` stretches `game/`'s stated scope slightly (presentation-derived, not game
-     mechanics) — chosen deliberately to keep it pure/testable; note this in CLAUDE.md's
-     Structure section when it lands.
-2. **The session controller** — the stateful layer wiring pure `game/`/`srs/` functions to React:
+1. **The session controller** — the stateful layer wiring pure `game/`/`srs/` functions to React:
    current screen, active queue, round in progress, the invisible five-minute clock and its
    "serve exactly one more item, then stop" rule (§4.11). This is the only genuinely new *logic*
    left; everything else is presentation.
-3. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
-   variants), Zusammenfassung. Sitzung is by far the biggest.
-4. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
+2. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
+   variants), Zusammenfassung. Sitzung is by far the biggest. Pfad is where `SteppingStone` gets a
+   real home, replacing the temporary `App.tsx` gallery.
+3. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
    screens get built, so a second locale stays possible.
-5. **`src/components/`** — doesn't exist yet.
 
 ---
 
