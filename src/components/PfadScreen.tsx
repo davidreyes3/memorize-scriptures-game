@@ -37,6 +37,10 @@ export function PfadScreen({ state, paths, verses, onStart, onBack }: PfadScreen
   // so a never-introduced verse should still count as "ready" here, not just already-due ones.
   const projected = introduceNewVerses(state.save, verses, now);
   const ready = assembleQueue(path.id, projected, verses, now, () => 0.5).length;
+  // If nothing's ready but this path still has verses nobody's ever seen, that's the
+  // daily newPerDay cap talking, not "nothing left" — say so, since Trotzdem üben can
+  // only re-serve already-introduced verses, never unlock these.
+  const capReached = ready === 0 && pathVerses.some((v) => projected.progress[v.id]?.introducedAt == null);
 
   const stones = pathVerses.map((v, i) => ({
     verse: v,
@@ -88,7 +92,7 @@ export function PfadScreen({ state, paths, verses, onStart, onBack }: PfadScreen
           </button>
         ) : (
           <>
-            <p className="cta-hint">{de.allesErledigt}</p>
+            <p className="cta-hint">{capReached ? de.capReached : de.allesErledigt}</p>
             <button className="secondary-btn" onClick={() => onStart(true)}>
               {de.trotzdemUeben}
             </button>

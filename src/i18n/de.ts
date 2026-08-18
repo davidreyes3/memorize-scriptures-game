@@ -15,6 +15,8 @@ export const de = {
   // Pfad (path detail / trail)
   losGehts: "Los geht's",
   allesErledigt: "Alles erledigt",
+  capReached:
+    "Für heute sind schon alle neuen Verse eingeführt. Erhöhe „Neue Verse pro Tag” auf der Pfade-Übersicht, um mehr freizuschalten.",
   trotzdemUeben: "Trotzdem üben",
   zurueck: "Zurück",
 
