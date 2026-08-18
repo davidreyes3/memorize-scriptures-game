@@ -33,7 +33,7 @@ export function SteppingStone({ progress }: SteppingStoneProps) {
 
   const healed = visual.state === "cracked" ? visual.healed : sealing ? 5 : 0;
   const showWedges = visual.state === "cracked" || sealing;
-  const dataState = sealing ? "cracked" : visual.state;
+  const dataState = sealing ? "sealing" : visual.state;
 
   const wedgeStyle: CSSProperties = showWedges
     ? ({
