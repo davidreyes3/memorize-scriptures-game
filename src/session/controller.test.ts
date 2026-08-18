@@ -236,6 +236,64 @@ describe("summary", () => {
   });
 });
 
+describe("justGraduated", () => {
+  it("records a verse that crosses into held this session", () => {
+    let state = initState((save) => {
+      save.progress.solo = { ...save.progress.solo, introducedAt: NOW - 1000, due: 0, stage: 4 };
+      return save;
+    });
+    state = reduce(state, { type: "SELECT_PATH", pathId: "gamma" });
+    state = reduce(state, { type: "START_SESSION", now: NOW, rng: rng("a") });
+    state = { ...state, current: { kind: "text", id: "solo", addressForm: null }, queue: [] };
+
+    const result = reduce(state, { type: "ANSWER", ok: true, now: NOW + 1000, rng: rng("x") });
+    expect(result.justGraduated).toEqual(["solo"]);
+  });
+
+  it("does not record a verse that was already held (no false re-graduation)", () => {
+    let state = initState((save) => {
+      save.progress.solo = { ...save.progress.solo, introducedAt: NOW - 1000, due: 0, stage: 5 };
+      return save;
+    });
+    state = reduce(state, { type: "SELECT_PATH", pathId: "gamma" });
+    state = reduce(state, { type: "START_SESSION", now: NOW, rng: rng("a") });
+    state = { ...state, current: { kind: "text", id: "solo", addressForm: null }, queue: [] };
+
+    const result = reduce(state, { type: "ANSWER", ok: true, now: NOW + 1000, rng: rng("x") });
+    expect(result.justGraduated).toEqual([]);
+  });
+
+  it("survives BACK_TO_PATHS (the Pfad screen needs it after the round trip through Zusammenfassung)", () => {
+    let state = initState((save) => {
+      save.progress.solo = { ...save.progress.solo, introducedAt: NOW - 1000, due: 0, stage: 4 };
+      return save;
+    });
+    state = reduce(state, { type: "SELECT_PATH", pathId: "gamma" });
+    state = reduce(state, { type: "START_SESSION", now: NOW, rng: rng("a") });
+    state = { ...state, current: { kind: "text", id: "solo", addressForm: null }, queue: [] };
+    state = reduce(state, { type: "ANSWER", ok: true, now: NOW + 1000, rng: rng("x") });
+
+    const result = reduce(state, { type: "BACK_TO_PATHS" });
+    expect(result.justGraduated).toEqual(["solo"]);
+  });
+
+  it("resets on the next START_SESSION", () => {
+    let state = initState((save) => {
+      save.progress.solo = { ...save.progress.solo, introducedAt: NOW - 1000, due: 0, stage: 4 };
+      return save;
+    });
+    state = reduce(state, { type: "SELECT_PATH", pathId: "gamma" });
+    state = reduce(state, { type: "START_SESSION", now: NOW, rng: rng("a") });
+    state = { ...state, current: { kind: "text", id: "solo", addressForm: null }, queue: [] };
+    state = reduce(state, { type: "ANSWER", ok: true, now: NOW + 1000, rng: rng("x") });
+    state = reduce(state, { type: "BACK_TO_PATHS" });
+
+    state = reduce(state, { type: "SELECT_PATH", pathId: "alpha" });
+    const result = reduce(state, { type: "START_SESSION", now: NOW + 2000, rng: rng("a") });
+    expect(result.justGraduated).toEqual([]);
+  });
+});
+
 describe("END_SESSION", () => {
   it("jumps to the summary screen, discarding the in-progress item", () => {
     const state = startedAlphaSession();

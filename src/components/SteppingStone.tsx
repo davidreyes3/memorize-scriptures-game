@@ -1,35 +1,42 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { stoneState } from "../game/stone";
 import type { VerseProgress } from "../game/types";
 import "./SteppingStone.css";
 
 interface SteppingStoneProps {
   progress: Pick<VerseProgress, "stage" | "introducedAt">;
+  // True when this verse crossed into "held" during the session that just ended — see
+  // session/controller.ts's `justGraduated`. Plays the sealing+gold sequence once, on
+  // mount, instead of the stone just silently appearing already gold.
+  justGraduated?: boolean;
 }
 
 // How long the stone holds at "all 5 wedges mended, still not gold" before the
 // cross-fade to held plays — long enough to register as its own beat, not a glitch.
 const SEAL_MS = 600;
 
-export function SteppingStone({ progress }: SteppingStoneProps) {
+export function SteppingStone({ progress, justGraduated = false }: SteppingStoneProps) {
   const visual = stoneState(progress);
-  const [sealing, setSealing] = useState(false);
-  const prevState = useRef(visual.state);
 
-  // stage jumps straight from "4 wedges healed" to "held" in the data — there's no
-  // stage for "all 5 healed, not yet gold." That frame is inserted here, transiently,
-  // so graduation reads as two beats (last wedge mends, then it turns gold) instead
-  // of one jump. Skipped under reduced motion, matching every other state swap here.
+  // Mount-only by design, not a live transition watcher: the Pfad screen unmounts
+  // while a session runs (App.tsx swaps screens, it doesn't keep them mounted
+  // side by side), so SteppingStone never sees progress change under it — it always
+  // mounts fresh, already in its final state. `justGraduated` is how the parent tells
+  // a freshly-mounted, already-held stone to play the graduation sequence anyway.
+  // If that ever stops being true (Pfad kept mounted across a session), this needs
+  // to become a real prop-change watcher instead of a mount-time-only one.
+  const [sealing, setSealing] = useState(() => {
+    if (!justGraduated || visual.state !== "held") return false;
+    return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+
   useEffect(() => {
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prevState.current === "cracked" && visual.state === "held" && !reduceMotion) {
-      setSealing(true);
-      const timer = setTimeout(() => setSealing(false), SEAL_MS);
-      prevState.current = visual.state;
-      return () => clearTimeout(timer);
-    }
-    prevState.current = visual.state;
-  }, [visual.state]);
+    if (!sealing) return;
+    const timer = setTimeout(() => setSealing(false), SEAL_MS);
+    return () => clearTimeout(timer);
+    // Intentionally mount-only — see the comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const healed = visual.state === "cracked" ? visual.healed : sealing ? 5 : 0;
   const showWedges = visual.state === "cracked" || sealing;

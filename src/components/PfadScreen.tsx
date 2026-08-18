@@ -77,7 +77,10 @@ export function PfadScreen({ state, paths, verses, onStart, onBack }: PfadScreen
           const clickable = isActive && ready > 0;
           const stoneAndPlaque = (
             <>
-              <SteppingStone progress={state.save.progress[s.verse.id]} />
+              <SteppingStone
+                progress={state.save.progress[s.verse.id]}
+                justGraduated={state.justGraduated.includes(s.verse.id)}
+              />
               <div className="plaque">
                 <p className="plaque-ref">{s.verse.ref}</p>
                 <p className="plaque-quote">

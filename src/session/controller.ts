@@ -52,6 +52,13 @@ export interface SessionState {
   overrunExtraServed: boolean;
   attempts: Attempt[];
   summary: SessionSummary | null;
+  // Verses that crossed into "held" during the session just finished. The Pfad screen
+  // unmounts while Sitzung runs, so SteppingStone never witnesses a live cracked->held
+  // transition to animate — by the time it remounts, the verse is already gold. This
+  // carries that information forward so it can play the graduation animation once,
+  // on the remount, instead of just silently appearing already-held. Cleared on the
+  // next START_SESSION, same lifecycle as `attempts`.
+  justGraduated: VerseId[];
 }
 
 export type SessionAction =
@@ -76,6 +83,7 @@ export function createInitialState(save: SaveData, verses: readonly Verse[]): Se
     overrunExtraServed: false,
     attempts: [],
     summary: null,
+    justGraduated: [],
   };
 }
 
@@ -114,6 +122,7 @@ export function reduce(state: SessionState, action: SessionAction): SessionState
         overrunExtraServed: false,
         attempts: [],
         summary: null,
+        justGraduated: [],
       };
     }
 
@@ -197,6 +206,11 @@ function completeCurrentItem(state: SessionState, outcome: Outcome, now: number,
   const attempts =
     current.kind === "aloud" ? state.attempts : [...state.attempts, { kind: current.kind, id: current.id, ok, stageBefore, stageAfter }];
 
+  const justGraduated =
+    stageBefore !== null && stageAfter === 5 && stageBefore !== 5
+      ? [...state.justGraduated, current.id]
+      : state.justGraduated;
+
   const queue = requeue ? [...state.queue, { kind: current.kind, id: current.id }] : state.queue;
   const overrunNow = state.startedAt !== null && isOverrun(state.startedAt, now);
 
@@ -208,6 +222,7 @@ function completeCurrentItem(state: SessionState, outcome: Outcome, now: number,
       current: null,
       screen: "zusammenfassung",
       attempts,
+      justGraduated,
       summary: summarize(attempts, save, state.verses, state.startedAt, now),
     };
   }
@@ -218,6 +233,7 @@ function completeCurrentItem(state: SessionState, outcome: Outcome, now: number,
     save,
     queue: rest,
     current: toActiveItem(next, rng),
+    justGraduated,
     attempts,
     overrunExtraServed: overrunNow,
   };
