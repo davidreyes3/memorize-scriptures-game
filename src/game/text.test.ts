@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bare, skeleton, tokenize } from "./text";
+import { bare, skeleton, tokenize, windowedSkeleton } from "./text";
 
 describe("tokenize", () => {
   it("splits on whitespace and trims", () => {
@@ -50,5 +50,28 @@ describe("skeleton", () => {
   it("shows the umlaut-initial letter, not a dot", () => {
     const result = skeleton(["Ägypten"], 0);
     expect(result[0].display).toBe("Ä");
+  });
+});
+
+describe("windowedSkeleton", () => {
+  const tokens = ["Am", "Anfang", "schuf", "Gott,", "Himmel"];
+
+  it("reveals words outside the window in full, regardless of position", () => {
+    const result = windowedSkeleton(tokens, [1, 2]);
+    expect(result[0]).toEqual({ display: "Am", revealed: true });
+    expect(result[3]).toEqual({ display: "Gott,", revealed: true });
+    expect(result[4]).toEqual({ display: "Himmel", revealed: true });
+  });
+
+  it("skeletonizes words inside the window, keeping trailing punctuation", () => {
+    const result = windowedSkeleton(tokens, [1, 2]);
+    expect(result[1]).toEqual({ display: "A", revealed: false });
+    expect(result[2]).toEqual({ display: "s", revealed: false });
+  });
+
+  it("handles a window that isn't a prefix (unlike skeleton's revealCount)", () => {
+    const result = windowedSkeleton(tokens, [0]);
+    expect(result[0].revealed).toBe(false);
+    expect(result[1].revealed).toBe(true);
   });
 });

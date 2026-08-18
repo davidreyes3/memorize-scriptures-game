@@ -15,16 +15,27 @@ export interface SkeletonPart {
   revealed: boolean;
 }
 
+/** First letter plus any trailing punctuation. A word with no letter renders "·". */
+function skeletonWord(word: string): string {
+  const letter = word.match(/\p{L}/u);
+  const trailing = word.match(/[.,;:!?]+$/);
+  return (letter ? letter[0] : "·") + (trailing ? trailing[0] : "");
+}
+
 /**
  * Words before `revealCount` render in full. The rest render as first letter plus any
  * trailing punctuation. A word with no letter (pure punctuation) renders "·".
  */
 export function skeleton(tokens: string[], revealCount: number): SkeletonPart[] {
-  return tokens.map((word, i) => {
-    if (i < revealCount) return { display: word, revealed: true };
-    const letter = word.match(/\p{L}/u);
-    const trailing = word.match(/[.,;:!?]+$/);
-    const display = (letter ? letter[0] : "·") + (trailing ? trailing[0] : "");
-    return { display, revealed: false };
-  });
+  return tokens.map((word, i) => (i < revealCount ? { display: word, revealed: true } : { display: skeletonWord(word), revealed: false }));
+}
+
+/**
+ * Like `skeleton`, but the hidden set is an arbitrary index window rather than a
+ * prefix — the Kalt rung's windowing (docs/build.md §4.6): words outside `window`
+ * render in full, words inside render skeletonized regardless of position.
+ */
+export function windowedSkeleton(tokens: string[], window: readonly number[]): SkeletonPart[] {
+  const hidden = new Set(window);
+  return tokens.map((word, i) => (hidden.has(i) ? { display: skeletonWord(word), revealed: false } : { display: word, revealed: true }));
 }
