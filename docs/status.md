@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (v1 — all four screens landed, app is playable end to end). Pushed through
-`e6182a7`; eleven more commits sit on top locally, not yet pushed (`33c5c18`..`0629ad8`).
+Last updated: 2026-08-18 (v1, then two rounds of user-feedback fixes). Pushed through `e6182a7`;
+fifteen more commits sit on top locally, not yet pushed (`33c5c18`..`c6334d9`).
 
 ---
 
@@ -28,18 +28,18 @@ injected, importing nothing from React:
 |---|---|
 | `game/types.ts` | all types + constants + `blankProgress` / `createSaveData` |
 | `game/random.ts` | `hashSeed`, `mulberry32`, `shuffle` — deterministic seeding |
-| `game/text.ts` | `tokenize`, `bare`, `skeleton`, `windowedSkeleton` — Unicode-aware |
+| `game/text.ts` | `tokenize`, `bare`, `skeleton` — Unicode-aware |
 | `game/round.ts` | `buildRound`, `decoysFor` |
 | `game/reference.ts` | `parseRef`, `formatRef`, `nearNumbers` — incl. verse ranges |
 | `game/erosion.ts` | `erosionStrip` — ⚠️ see loose ends |
 | `srs/grading.ts` | `gradeText`, look-up + aloud marking — **no `gradeRef`**, see below |
-| `srs/introduction.ts` | `introduceNewVerses` — the per-day cap |
+| `srs/introduction.ts` | `introduceNewVerses` — per-day cap **and** one-verse-at-a-time unlocking per path |
 | `srs/queue.ts` | `assembleQueue`, `isHeld(progress: { stage })` |
 | `srs/session.ts` | `timeLeft`, `isOverrun` — pure clock arithmetic only |
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**147 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
+**148 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
 the stepping stone, and the session controller. `npm run build` type-checks clean (`@types/node`
 added as a dev dependency to fix `licensing.test.ts`'s use of `node:fs`/`node:path`, which `tsc`
 couldn't resolve without it).
@@ -102,17 +102,33 @@ here; every screen is presentation over what `session/controller.ts` and `game/`
 
 - **Sitzung's graded bodies hold a local verdict before dispatching.** The controller advances
   `current` the instant `answer()`/`lookup()` is called, but the spec wants a verdict block *before*
-  advancing — so cloze/Kalt/Erkennen/Zuordnen/Bilden compute correctness themselves (comparing
-  against `buildRound`'s window or `parseRef`'s parts), show right/wrong locally, and only call
-  `onAnswer` once the user taps *Weiter*. `Lesen` and *Aloud* skip this — they're explicitly
-  "not graded," so tapping the one button advances immediately.
-- **Kalt reuses `windowedSkeleton`** (new — see below) instead of `skeleton`, since its window can
-  land anywhere in a long verse, not just as a prefix.
+  advancing — so cloze/Erkennen/Zuordnen/Bilden compute correctness themselves (comparing against
+  `buildRound`'s window or `parseRef`'s parts), show right/wrong locally, and only call `onAnswer`
+  once the user taps *Weiter*. `Lesen` and *Aloud* skip this — they're explicitly "not graded," so
+  tapping the one button advances immediately.
+- **Rung 5 (Kalt) reuses the same cloze body as rungs 2–4**, not a separate skeleton/tap-in-order
+  exercise. The original build had one — first-letter skeleton, tiles tapped in a forced sequence,
+  slip counting — but user feedback after actually using it was that this was more annoying than
+  useful, so it's gone. `windowedSkeleton` (`game/text.ts`) went with it, since it only ever existed
+  to back that rendering; `skeleton()` itself stays, since it's still `build.md`'s documented
+  contract independent of what currently calls it (same status as `erosion.ts` below).
 - **The address-`Bilden`/`Erkennen` decoy addresses use `nearNumbers` on chapter and verse**,
   combined with the verse's own book; `Zuordnen`'s decoy texts are three other verses picked at
   random via the same seeded-`rng`-per-item pattern everything else here uses
   (`hashSeed(verse.id, seen, salt)`), so a body's options are stable across re-renders without
   memoization.
+- **Verses now unlock one at a time within a path** (`srs/introduction.ts`) — a verse is only
+  introducible once the one before it in its path is held, not just "up to `newPerDay` in
+  declaration order" as originally built. This is a gate on introduction only; once introduced a
+  verse stays introduced regardless of later review outcomes, and the daily `newPerDay` cap still
+  applies on top, now spread across however many paths currently have an eligible candidate. See
+  `introduction.test.ts` for the unlock-on-mastery / paths-unlock-independently cases.
+- **`Trotzdem üben` is gone.** With unlocking sequential, the held verses in a path always form a
+  prefix, so there's always at most one "active" stone — that stone is now the tap target itself
+  (`PfadScreen`, pulses gently via `trail-stone-active`), starting a session with no way to force
+  practice ahead of what's actually due. A stone that's technically still un-introduced but *is*
+  the active one gets an opacity/outline override so it doesn't read as inert the way a genuinely
+  future-locked stone does.
 - **Two bugs were found by actually running the app** (Playwright against the dev server, not just
   `tsc`/`vitest`) and are fixed, not just noted: `PfadeScreen`/`PfadScreen` were computing "ready"
   from the queue *before* `introduceNewVerses` ran, so a first-time visit always read "Alles
@@ -122,6 +138,11 @@ here; every screen is presentation over what `session/controller.ts` and `game/`
   exactly 520px — narrower phones cut plaques off past the edge. Fixed by moving to a 0–100
   abstract x-axis (`preserveAspectRatio="none"` on the SVG, `left: X%` on the stone divs), so the
   two always agree at any width.
+- **What looked like a third bug — "it never gets past the same scriptures" — was the daily
+  `newPerDay` cap plus `Trotzdem üben`** re-serving already-held verses with no signal explaining
+  why nothing new appeared. Sequential unlocking plus removing `Trotzdem üben` (above) addresses
+  this directly; `PfadScreen`'s `capReached` hint (added in the previous round) still covers the
+  remaining case where the *next* eligible verse exists but today's `newPerDay` quota is spent.
 
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
