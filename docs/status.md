@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (v1, then four rounds of user-feedback fixes). Pushed through `e6182a7`;
-twenty-four more commits sit on top locally, not yet pushed (`33c5c18`..`c6581d9`).
+Last updated: 2026-08-18 (v1, then five rounds of user-feedback fixes). Pushed through `1cb5963`;
+one more commit sits on top locally, not yet pushed (`9a4e6fc`).
 
 ---
 
@@ -39,7 +39,7 @@ injected, importing nothing from React:
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**147 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
+**151 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
 the stepping stone, and the session controller. `npm run build` type-checks clean (`@types/node`
 added as a dev dependency to fix `licensing.test.ts`'s use of `node:fs`/`node:path`, which `tsc`
 couldn't resolve without it).
@@ -64,14 +64,29 @@ stage, so reaching held silently healed *two* wedges (4 and 5) in the same insta
 which read as a jump rather than a completion. `healed = stage` reaches 4-of-5, leaving exactly one
 crack for graduation to close.
 
-Graduation itself is two beats, not one: `SteppingStone` detects the cracked→held transition and
-holds a transient "sealing" frame — all 5 wedges mended, still not gold, with a small breathing
-pulse (`stone-seal` keyframe) — for 600ms before the existing gold cross-fade plays. This frame has
-no backing `stage` value (there isn't a 6th rung to spare); it's inserted at the component level
-via a `useState`/`useEffect` pair watching for that one edge, and skipped entirely under
-`prefers-reduced-motion`. `stoneState` itself stays a pure 3-state function — see `CLAUDE.md`'s
-Structure section for why the split lands there. Now rendered for real on the Pfad trail
-(`PfadScreen.tsx`) rather than the old `App.tsx` gallery, which is gone.
+Graduation itself is two beats, not one: a transient "sealing" frame — all 5 wedges mended, still
+not gold, with a small breathing pulse (`stone-seal` keyframe) — holds for 600ms before the gold
+cross-fade plays (0.65s, synced with the `stone-graduate` keyframe). This frame has no backing
+`stage` value (there isn't a 6th rung to spare). `stoneState` itself stays a pure 3-state function —
+see `CLAUDE.md`'s Structure section for why the split lands there. Rendered for real on the Pfad
+trail (`PfadScreen.tsx`); the old `App.tsx` gallery is gone.
+
+**The graduation animation didn't actually play, and the fix wasn't a CSS tweak.** User feedback
+("very abrupt going from gray to gold") turned out to be literally true: `App.tsx` swaps screens
+rather than keeping them mounted, so the Pfad screen — and every `SteppingStone` on it — unmounts
+the instant a session starts and remounts fresh, already in its final state, once the user returns.
+The component never witnessed a live cracked→held transition to animate; there was also a real
+one-frame flash in the old ref-based detection (`useEffect` runs after paint, so a bare
+`data-state="held"` frame briefly rendered before snapping to the sealing look). Fixed by inverting
+the design: `session/controller.ts` now tracks `justGraduated: VerseId[]` — verses that crossed into
+held during the session just finished, populated in `completeCurrentItem`, deliberately *not*
+cleared by `BACK_TO_PATHS` (the Pfad screen needs it after the round trip through Zusammenfassung),
+cleared on the next `START_SESSION`. `PfadScreen` passes it down per stone; `SteppingStone` treats
+it as a mount-time-only signal (a `useState` lazy initializer, no ref, no live-transition
+detection) — correct precisely because it never relies on witnessing a change, only on being told
+"you should open already sealing." Verified with `controller.test.ts` (the `justGraduated` tracking
+itself) and a real Playwright run driving a verse from stage 1 to held across several actual
+sessions, confirming via `MutationObserver` that `sealing -> held` now genuinely plays on remount.
 
 **The session controller** (`build.md` §4.9–4.11, §6) — `src/session/controller.ts`'s pure
 `reduce(state, action)` (test-first, 16 cases in `controller.test.ts`) plus the thin
