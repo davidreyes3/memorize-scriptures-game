@@ -1,0 +1,87 @@
+.pfad h1 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--ink);
+}
+
+.pfad .blurb {
+  font-family: var(--font-ui);
+  color: var(--ink-muted);
+  margin: 0 0 1rem;
+}
+
+.trail-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.trail-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.trail-ahead {
+  stroke: var(--trail-ahead);
+  stroke-width: 3;
+  stroke-dasharray: 2 10;
+  stroke-linecap: round;
+}
+
+.trail-walked {
+  stroke: var(--moss);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.trail-stone {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plaque {
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  padding: 0.4rem 0.6rem;
+  max-width: 130px;
+  text-align: center;
+}
+
+.plaque-ref {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  margin: 0 0 0.15rem;
+}
+
+.plaque-quote {
+  font-family: var(--font-scripture);
+  font-size: 0.82rem;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.pfad-cta {
+  position: sticky;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.cta-hint {
+  font-family: var(--font-ui);
+  color: var(--ink-muted);
+  margin: 0;
+}

@@ -1,0 +1,53 @@
+.sitzung {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sitzung-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rung-segments {
+  display: flex;
+  gap: 4px;
+}
+
+.rung-seg {
+  width: 18px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--stone);
+}
+
+.rung-seg.filled {
+  background: var(--moss);
+}
+
+.sitzung-ref {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.sitzung-body {
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.lookup-btn {
+  align-self: flex-start;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  background: none;
+  border: none;
+  color: var(--clay);
+  text-decoration: underline;
+  padding: 0.4rem 0;
+  cursor: pointer;
+}

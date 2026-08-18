@@ -1,0 +1,167 @@
+.scripture-text {
+  font-family: var(--font-scripture);
+  font-size: 1.2rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.hint,
+.prompt {
+  font-family: var(--font-ui);
+  color: var(--ink-muted);
+  margin: 0.5rem 0;
+}
+
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  margin: 1rem 0 0.4rem;
+}
+
+.blank {
+  display: inline-block;
+  min-width: 3em;
+  border-bottom: 2px dotted var(--stone-line);
+  color: var(--water);
+  font-weight: 600;
+}
+
+.blank.filled {
+  border-bottom-style: solid;
+  border-color: var(--moss);
+}
+
+.tile-bank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tile {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  padding: 0.5rem 0.9rem;
+  min-height: 44px;
+  border: 1px solid var(--surface-line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tile:disabled,
+.tile.used {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tile.wrong {
+  border-color: var(--clay);
+  background: color-mix(in srgb, var(--clay) 18%, var(--surface));
+}
+
+.body-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.primary-btn,
+.secondary-btn,
+.link-btn {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+}
+
+.primary-btn {
+  background: var(--waymark);
+  color: var(--on-waymark);
+}
+
+.primary-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.secondary-btn {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--surface-line);
+}
+
+.secondary-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  padding: 0.5rem 0;
+  text-decoration: underline;
+}
+
+.verdict-ok {
+  color: var(--water);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
+.verdict-fail {
+  color: var(--clay);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+
+.option {
+  font-family: var(--font-ui);
+  text-align: left;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.options-text .option {
+  font-family: var(--font-scripture);
+  font-size: 1.05rem;
+}
+
+.option.selected {
+  border-color: var(--waymark);
+  border-width: 2px;
+}
+
+.option.verdict-ok {
+  border-color: var(--water);
+  background: color-mix(in srgb, var(--water) 15%, var(--surface));
+}
+
+.option.verdict-fail {
+  border-color: var(--clay);
+  background: color-mix(in srgb, var(--clay) 15%, var(--surface));
+}
+
+.option:disabled {
+  cursor: default;
+}
