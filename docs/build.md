@@ -82,12 +82,6 @@ interface VerseProgress {
 interface SaveData {
   schemaVersion: number;
   progress:      Record<VerseId, VerseProgress>;
-  introductions: Record<string, number>;  // "YYYY-MM-DD" -> verses introduced that day
-  settings:      Settings;
-}
-
-interface Settings {
-  newPerDay: number;   // default DEFAULT_NEW_PER_DAY; user-adjustable
 }
 ```
 
@@ -97,6 +91,14 @@ New verses start `{ stage:1, due:0, seen:0, lastAloud:0, introducedAt:null }`.
 > second 3-rung ladder for the address (book, chapter, verse) that gated its own "gold" graduation.
 > Cut: see the design decision in §7.3. The address question still exists (§4.5, §4.10) — it just
 > no longer owns any scheduled state.
+
+> ⚠️ **Deviation from an earlier pass.** `SaveData` used to also carry `introductions` (a
+> `"YYYY-MM-DD" -> count` map) and `settings.newPerDay`, backing a daily cap on how many verses
+> could be introduced at once. Cut once introduction became sequential per path (§4.9) — with a
+> verse only unlockable after the one before it in its path is held, the cap had nothing left to
+> bound; the user pointed out that tapping the next stone whenever you want to keep going is
+> already the right pace, and a settings knob for it was one more thing to explain. `SCHEMA_VERSION`
+> bumped to 3 for the shape change.
 
 ### Constants
 
@@ -109,9 +111,8 @@ New verses start `{ stage:1, due:0, seen:0, lastAloud:0, introducedAt:null }`.
 | `MIN_WINDOW` | `3` | fewest, unless the verse is shorter |
 | `SESSION_MS` | `300_000` | five minutes |
 | `ALOUD_GAP_MS` | `7 * 86_400_000` | how often a held verse is read aloud again |
-| `DEFAULT_NEW_PER_DAY` | `2` | verses introduced per day, **across all paths**. Seeds `settings.newPerDay`, which the user can change |
 | `EROSION_MAX_CHARS` | `60` | how much of a verse the erosion strip shows before truncating |
-| `SCHEMA_VERSION` | `2` | bump on any `SaveData` shape change |
+| `SCHEMA_VERSION` | `3` | bump on any `SaveData` shape change |
 
 Rung names: `["Lesen","Satzteil","Abschnitt","Aufbau","Kalt"]`.
 Address question forms: `["Erkennen","Zuordnen","Bilden"]` — not rungs, just three shapes of the
@@ -295,22 +296,23 @@ library that guarantees a queue that never clears.
 introduceNewVerses(save: SaveData, verses: Verse[], now: number): SaveData
 ```
 
-Called once at session start, **before** queue assembly:
+Called once at session start, **before** queue assembly. Verses unlock **one at a time within a
+path**, stepping-stone style: for each path, take its first verse with `introducedAt === null`, and
+introduce it only if the verse immediately before it in that path (if any) is held (`stage === 5`).
+A path with no held verses yet still gets its first verse introduced immediately — there's no
+predecessor to wait on. Stamp `introducedAt = now` for every verse introduced this way, across every
+path that currently has an eligible candidate.
 
-1. `today = "YYYY-MM-DD"` in local time.
-2. `allowed = save.settings.newPerDay - (save.introductions[today] ?? 0)`; stop if `<= 0`.
-3. Take up to `allowed` verses with `introducedAt === null`, in declaration order.
-4. Stamp `introducedAt = now`, and add the count to `introductions[today]`.
+Verses with `introducedAt === null` **never enter a queue**. This is a gate on introduction only:
+once introduced, a verse stays introduced even if a later review drops it back below `stage === 5`.
 
-Verses with `introducedAt === null` **never enter a queue**. Prune `introductions` entries older
-than ~30 days on save so the object cannot grow without bound.
-
-The cap is **global across all paths** — it exists to bound total daily workload, and a per-path
-cap would scale with path count in exactly the wrong direction. It is **user-adjustable**
-(`settings.newPerDay`), because the right number only becomes obvious once five minutes has been
-lived with. Lowering it mid-library is always safe; it just slows introductions.
-
-Changing the setting never retroactively un-introduces a verse.
+> ⚠️ **Deviation from an earlier pass.** This used to be capped globally across all paths by a
+> user-adjustable `settings.newPerDay` (default `DEFAULT_NEW_PER_DAY = 2`), independent of mastery —
+> "introduce up to N verses a day, in declaration order," full stop. Cut once unlocking became
+> sequential: with a verse only introducible after the one before it in its path is held, the daily
+> cap no longer bounded anything real. The user's own framing: once you can just tap the next stone
+> whenever you want to keep going, a separate setting for "how many new ones per day" has nothing
+> left to do. `settings`/`introductions` are gone from `SaveData` entirely (§3).
 
 ### 4.10 Session queue
 
@@ -331,7 +333,12 @@ Shuffle the result. `aloud` is **not a test** — it shows the verse, asks the u
 the timer on "Gesagt", and grades nothing. It never gates progression (§10.4). `ref` **is** graded
 (right/wrong feeds the verdict block) but never gates progression either — see §4.5.
 
-A **"Trotzdem üben"** escape hatch assembles a queue ignoring due dates when nothing is due.
+> ⚠️ **Deviation from an earlier pass.** `assembleQueue`'s `force` parameter used to back a
+> **"Trotzdem üben"** UI escape hatch that assembled a queue ignoring due dates when nothing was
+> due. The button is gone (§6, §7.3's Pfad description) — with introduction sequential (§4.9) there's
+> always at most one active stone to tap, and forcing practice ahead of the algorithm's own schedule
+> wasn't something the user wanted. `force` itself stays on `assembleQueue`, unused by the UI, since
+> it's cheap to keep and nothing currently calls it with `true`.
 
 ### 4.11 Session clock
 
@@ -394,8 +401,8 @@ reduces the rest to first letters — the progress bar and study aid in one (`sp
 Four. Deploy is cut.
 
 **Pfade (paths list)** — masthead with *held* tally, one card per path showing name, blurb, and how
-many items are ready. Below: a **"Neue Verse pro Tag"** stepper bound to `settings.newPerDay`, and
-the reset control.
+many items are ready. Below: the reset control. No newPerDay stepper — see the §4.9 deviation note;
+"keep going" is the next stone on the Pfad trail, not a setting here.
 
 Each card also carries a **mini-trail preview** — a small decorative squiggle with **always exactly
 3** dots, echoing the full stepping-stone trail on the Pfad screen at a glance. It's a symbol, not a
@@ -406,10 +413,12 @@ like a real long path.
 
 **Pfad (path detail)** — **the trail.** Not a list of rows: verses are stepping stones (§7.3)
 positioned along a winding SVG path, walked segment solid, the rest dotted. Each stone carries an
-opaque plaque below it with the reference and a short quote snippet. The primary *"Los geht's"*
-pill floats beside the current stone; when nothing is due it reads *"Alles erledigt"* with
-*"Trotzdem üben"* available. No pips, no per-verse rung numbers, no erosion strip — a stone's
-state **is** the progress display.
+opaque plaque below it with the reference and a short quote snippet. The held stones in a path
+always form a prefix (introduction is sequential, §4.9), so there's always at most one **active**
+stone — the first non-held one — and it doubles as the tap target: pulsing gently, it starts a
+session directly when tapped. When nothing is due, no stone is tappable and the trail reads *"Alles
+erledigt"* — no force-practice override. No pips, no per-verse rung numbers, no erosion strip — a
+stone's state **is** the progress display.
 
 **Sitzung (session item)** — shared chrome: end-session link, rung segments, reference,
 **Nachschlagen** button, reveal area. No countdown, no draining bar — per §4.11 the timer is fully
@@ -602,11 +611,10 @@ when the path holds one verse**; returns `[]` for `n = 0`.
 **`gradeText`** — advances one rung; floors at 2; ceilings at 5; due dates match the interval
 table; `seen` increments on pass and on fail; a looked-up round moves no rung and sets `due = 0`.
 
-**`introduceNewVerses`** — introduces at most `settings.newPerDay`; a second call the same day
-introduces none; the next calendar day introduces the full quota again; stamps `introducedAt`;
-no-op when nothing is uninitialised; old `introductions` keys are pruned; **raising the setting
-mid-day makes the extra slots immediately available, and lowering it below today's count
-introduces none rather than throwing or un-introducing anything.**
+**`introduceNewVerses`** — introduces the first verse of every path in one call; stamps
+`introducedAt`; a path's second verse never unlocks until its first is held, no matter how many
+times the function runs; unlocks immediately once it is; paths unlock independently of each other;
+no-op once every verse in the library is introduced.
 
 **`erosionStrip`** — stops before exceeding `EROSION_MAX_CHARS` and appends `…`; shows at least
 three words even when they are long compounds; a short verse shows in full with no ellipsis;
