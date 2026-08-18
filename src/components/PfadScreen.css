@@ -72,12 +72,16 @@ button.trail-stone-active .stone[data-state="locked"] {
 }
 
 @keyframes trail-stone-beckon {
+  /* Rest state stays faintly lit rather than fully transparent — a glow that
+     touches zero alpha crosses the eye's visibility threshold abruptly no
+     matter how the easing is tuned, which is what read as a "pop" instead
+     of a breath. Fading between faint and bright keeps it continuous. */
   0%,
   100% {
-    filter: drop-shadow(0 0 0 transparent);
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--waymark) 12%, transparent));
   }
   50% {
-    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--waymark) 55%, transparent));
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--waymark) 45%, transparent));
   }
 }
 
