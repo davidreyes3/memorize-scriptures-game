@@ -26,15 +26,9 @@ export interface VerseProgress {
   introducedAt: number | null; // null = not yet in rotation
 }
 
-export interface Settings {
-  newPerDay: number;
-}
-
 export interface SaveData {
   schemaVersion: number;
   progress: Record<VerseId, VerseProgress>;
-  introductions: Record<string, number>; // "YYYY-MM-DD" -> count
-  settings: Settings;
 }
 
 export function blankProgress(): VerseProgress {
@@ -50,12 +44,7 @@ export function blankProgress(): VerseProgress {
 export function createSaveData(verses: readonly Verse[]): SaveData {
   const progress: Record<VerseId, VerseProgress> = {};
   for (const v of verses) progress[v.id] = blankProgress();
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    progress,
-    introductions: {},
-    settings: { newPerDay: DEFAULT_NEW_PER_DAY },
-  };
+  return { schemaVersion: SCHEMA_VERSION, progress };
 }
 
 // --- Constants (docs/build.md §3) ---
@@ -68,9 +57,8 @@ export const MIN_WINDOW = 3;
 export const SESSION_MS = 300_000;
 export const DAY_MS = 86_400_000;
 export const ALOUD_GAP_MS = 7 * DAY_MS;
-export const DEFAULT_NEW_PER_DAY = 2;
 export const EROSION_MAX_CHARS = 60;
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const TEXT_RUNG_NAMES = ["Lesen", "Satzteil", "Abschnitt", "Aufbau", "Kalt"] as const;
 // Not rungs — three forms of one ungated address question, picked at random (build.md §4.10).

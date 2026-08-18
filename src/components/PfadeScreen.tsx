@@ -1,6 +1,8 @@
 // Pfade (paths list) — docs/build.md §6. Masthead with held tally, one card per path
-// with a 3-dot mini-trail preview (a symbol, never one dot per verse), the newPerDay
-// stepper, and the reset control.
+// with a 3-dot mini-trail preview (a symbol, never one dot per verse), and the reset
+// control. No newPerDay stepper — verses unlock one at a time per path (srs/
+// introduction.ts), so there's nothing left for a daily-cap setting to do; the tap
+// target for "keep going" is the next stone on the Pfad trail, not a setting here.
 import { de } from "../i18n/de";
 import type { PathId, Path, Verse } from "../game/types";
 import type { SessionState } from "../session/controller";
@@ -13,11 +15,10 @@ interface PfadeScreenProps {
   paths: readonly Path[];
   verses: readonly Verse[];
   onSelectPath: (id: PathId) => void;
-  onSetNewPerDay: (n: number) => void;
   onReset: () => void;
 }
 
-export function PfadeScreen({ state, paths, verses, onSelectPath, onSetNewPerDay, onReset }: PfadeScreenProps) {
+export function PfadeScreen({ state, paths, verses, onSelectPath, onReset }: PfadeScreenProps) {
   const now = Date.now();
   const totalHeld = verses.filter((v) => isHeld(state.save.progress[v.id])).length;
   // Same preview as PfadScreen: introduceNewVerses runs before assembleQueue at session
@@ -57,14 +58,6 @@ export function PfadeScreen({ state, paths, verses, onSelectPath, onSetNewPerDay
       </div>
 
       <div className="settings">
-        <div className="stepper-row">
-          <span className="stepper-label">{de.newPerDayLabel}</span>
-          <div className="stepper">
-            <button onClick={() => onSetNewPerDay(state.save.settings.newPerDay - 1)}>−</button>
-            <span className="stepper-value">{state.save.settings.newPerDay}</span>
-            <button onClick={() => onSetNewPerDay(state.save.settings.newPerDay + 1)}>+</button>
-          </div>
-        </div>
         <button
           className="reset-btn"
           onClick={() => {

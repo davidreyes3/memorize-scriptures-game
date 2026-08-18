@@ -31,7 +31,6 @@ describe("load", () => {
   it("round-trips a full save through persist", () => {
     const original = createSaveData(FIXTURE_VERSES);
     original.progress.f1.stage = 4;
-    original.settings.newPerDay = 3;
     persist(original);
     expect(load(FIXTURE_VERSES)).toEqual(original);
   });
@@ -42,7 +41,7 @@ describe("load", () => {
   });
 
   it("degrades to defaults on an unknown schema version, without touching the stored value", () => {
-    const stale = JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1, progress: {}, introductions: {} });
+    const stale = JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1, progress: {} });
     localStorage.setItem("engrave.save", stale);
     expect(load(FIXTURE_VERSES)).toEqual(createSaveData(FIXTURE_VERSES));
     expect(localStorage.getItem("engrave.save")).toBe(stale);

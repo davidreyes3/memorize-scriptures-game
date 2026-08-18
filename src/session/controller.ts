@@ -62,7 +62,6 @@ export type SessionAction =
   | { type: "ALOUD_DONE"; now: number; rng: () => number }
   | { type: "END_SESSION"; now: number }
   | { type: "BACK_TO_PATHS" }
-  | { type: "SET_NEW_PER_DAY"; value: number }
   | { type: "HYDRATE"; save: SaveData };
 
 export function createInitialState(save: SaveData, verses: readonly Verse[]): SessionState {
@@ -142,9 +141,6 @@ export function reduce(state: SessionState, action: SessionAction): SessionState
         queue: [],
         summary: summarize(state.attempts, state.save, state.verses, state.startedAt, action.now),
       };
-
-    case "SET_NEW_PER_DAY":
-      return { ...state, save: { ...state.save, settings: { ...state.save.settings, newPerDay: Math.max(0, action.value) } } };
 
     case "HYDRATE":
       return createInitialState(action.save, state.verses);

@@ -44,7 +44,7 @@ describe("START_SESSION", () => {
     expect(state.current).not.toBeNull();
     expect(["f1", "f2", "f3"]).toContain(state.current!.id);
     // Verses unlock one at a time per path (srs/introduction.ts) — f2/f3 need their
-    // predecessor held first, so only f1 is introducible here regardless of newPerDay.
+    // predecessor held first, so only f1 is introducible here.
     const introducedCount = ["f1", "f2", "f3"].filter((id) => state.save.progress[id].introducedAt !== null).length;
     expect(introducedCount).toBe(1);
     expect(state.save.progress.f1.introducedAt).toBe(NOW);
@@ -55,7 +55,6 @@ describe("START_SESSION", () => {
       for (const id of ["f1", "f2", "f3"]) {
         save.progress[id] = { ...save.progress[id], introducedAt: NOW, due: NOW + 999_999 };
       }
-      save.settings.newPerDay = 0;
       return save;
     });
     state = reduce(state, { type: "SELECT_PATH", pathId: "alpha" });

@@ -51,16 +51,6 @@ export function PfadScreen({ state, paths, verses, onStart, onBack }: PfadScreen
   while (walked < stones.length && isHeld(state.save.progress[stones[walked].verse.id])) walked++;
   const activeIndex = walked < stones.length ? walked : stones.length - 1;
 
-  // The active stone is always sequentially eligible for introduction (its predecessor,
-  // if any, is held by construction) — if it's still uninitialized even after projecting
-  // introduceNewVerses, the daily newPerDay cap is the only thing blocking it.
-  const activeVerseId = stones[activeIndex]?.verse.id;
-  const capReached =
-    ready === 0 &&
-    activeVerseId !== undefined &&
-    state.save.progress[activeVerseId].introducedAt == null &&
-    projected.progress[activeVerseId]?.introducedAt == null;
-
   const height = TOP_MARGIN + (stones.length - 1) * SPACING + 100;
   const fullPath = stones.map((s, i) => `${i === 0 ? "M" : "L"} ${s.x} ${s.y}`).join(" ");
   const walkedPath = stones
@@ -114,9 +104,7 @@ export function PfadScreen({ state, paths, verses, onStart, onBack }: PfadScreen
         })}
       </div>
 
-      {ready === 0 && (
-        <p className="cta-hint">{capReached ? de.capReached : de.allesErledigt}</p>
-      )}
+      {ready === 0 && <p className="cta-hint">{de.allesErledigt}</p>}
     </section>
   );
 }

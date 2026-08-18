@@ -18,7 +18,6 @@ export default function App() {
     lookup,
     aloudDone,
     endSession,
-    setNewPerDay,
     resetProgress,
   } = useSession(VERSES_DE);
 
@@ -34,7 +33,6 @@ export default function App() {
           paths={PATHS_DE}
           verses={VERSES_DE}
           onSelectPath={selectPath}
-          onSetNewPerDay={setNewPerDay}
           onReset={resetProgress}
         />
       )}

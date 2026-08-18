@@ -22,7 +22,6 @@ export function useSession(verses: readonly Verse[]) {
     lookup: () => dispatch({ type: "LOOKUP", now: Date.now(), rng: Math.random }),
     aloudDone: () => dispatch({ type: "ALOUD_DONE", now: Date.now(), rng: Math.random }),
     endSession: () => dispatch({ type: "END_SESSION", now: Date.now() }),
-    setNewPerDay: (value: number) => dispatch({ type: "SET_NEW_PER_DAY", value }),
     resetProgress: () => dispatch({ type: "HYDRATE", save: reset(verses) }),
   };
 }

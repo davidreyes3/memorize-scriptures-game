@@ -8,15 +8,12 @@ export const de = {
   pfadeTitle: "Pfade",
   held: (n: number) => `${n} gehalten`,
   ready: (n: number) => (n === 1 ? "1 bereit" : `${n} bereit`),
-  newPerDayLabel: "Neue Verse pro Tag",
   resetLabel: "Fortschritt zurücksetzen",
   resetConfirm: "Wirklich den gesamten Fortschritt löschen? Das kann nicht rückgängig gemacht werden.",
 
   // Pfad (path detail / trail)
   losGehts: "Los geht's",
   allesErledigt: "Alles erledigt",
-  capReached:
-    "Für heute sind schon alle neuen Verse eingeführt. Erhöhe „Neue Verse pro Tag” auf der Pfade-Übersicht, um mehr freizuschalten.",
   zurueck: "Zurück",
 
   // Sitzung chrome

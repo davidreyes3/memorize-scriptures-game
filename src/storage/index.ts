@@ -37,8 +37,6 @@ export function load(verses: readonly Verse[]): SaveData {
   return {
     schemaVersion: parsed.schemaVersion,
     progress: { ...defaults.progress, ...parsed.progress },
-    introductions: parsed.introductions ?? {},
-    settings: { ...defaults.settings, ...parsed.settings },
   };
 }
 
