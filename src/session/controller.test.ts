@@ -53,7 +53,9 @@ describe("START_SESSION", () => {
   it("stays put and only persists introductions when nothing ends up due", () => {
     let state = initState((save) => {
       for (const id of ["f1", "f2", "f3"]) {
-        save.progress[id] = { ...save.progress[id], introducedAt: NOW, due: NOW + 999_999 };
+        // Held (stage 5), so due-date gating actually applies (srs/queue.ts) — an
+        // unheld verse is always due, so this scenario needs mastery to be genuinely empty.
+        save.progress[id] = { ...save.progress[id], stage: 5, introducedAt: NOW, due: NOW + 999_999, lastAloud: NOW };
       }
       return save;
     });

@@ -27,10 +27,18 @@ describe("assembleQueue", () => {
     expect(items.some((i) => i.kind === "text" && i.id === "f1")).toBe(true);
   });
 
-  it("excludes a text item that is introduced but not yet due", () => {
-    const save = withProgress({ f1: { due: NOW + 10_000 } });
+  it("excludes a text item only once held (stage 5) and not yet due", () => {
+    const save = withProgress({ f1: { stage: 5, due: NOW + 10_000 } });
     const items = assembleQueue("alpha", save, FIXTURE_VERSES, NOW, mulberry32(1));
     expect(items.some((i) => i.kind === "text" && i.id === "f1")).toBe(false);
+  });
+
+  it("includes a text item that isn't held yet, even if its due date is in the future", () => {
+    // The verse currently being learned should never be blocked by the interval table —
+    // due only gates spaced review of something already mastered (stage 5).
+    const save = withProgress({ f1: { stage: 3, due: NOW + 10_000 } });
+    const items = assembleQueue("alpha", save, FIXTURE_VERSES, NOW, mulberry32(1));
+    expect(items.some((i) => i.kind === "text" && i.id === "f1")).toBe(true);
   });
 
   it("includes a ref item only at stage >= 2, riding a due text item", () => {
@@ -47,8 +55,8 @@ describe("assembleQueue", () => {
     ).toBe(true);
   });
 
-  it("excludes a ref item when the verse's text isn't due yet, even at stage >= 2", () => {
-    const notDue = withProgress({ f1: { stage: 2, due: NOW + 10_000 } });
+  it("excludes a ref item when a held verse's text isn't due yet", () => {
+    const notDue = withProgress({ f1: { stage: 5, due: NOW + 10_000 } });
     expect(
       assembleQueue("alpha", notDue, FIXTURE_VERSES, NOW, mulberry32(1)).some((i) => i.kind === "ref"),
     ).toBe(false);
@@ -77,8 +85,8 @@ describe("assembleQueue", () => {
     expect(kinds.sort()).toEqual(["aloud", "ref", "text"]);
   });
 
-  it("force ignores due dates for text, and ref rides along", () => {
-    const save = withProgress({ f1: { stage: 2, due: NOW + 100_000 } });
+  it("force ignores due dates for a held verse's text, and ref rides along", () => {
+    const save = withProgress({ f1: { stage: 5, due: NOW + 100_000 } });
     const items = assembleQueue("alpha", save, FIXTURE_VERSES, NOW, mulberry32(1), true);
     expect(items.some((i) => i.kind === "text" && i.id === "f1")).toBe(true);
     expect(items.some((i) => i.kind === "ref" && i.id === "f1")).toBe(true);
