@@ -21,7 +21,7 @@ export function useSession(verses: readonly Verse[]) {
     answer: (ok: boolean) => dispatch({ type: "ANSWER", ok, now: Date.now(), rng: Math.random }),
     lookup: () => dispatch({ type: "LOOKUP", now: Date.now(), rng: Math.random }),
     aloudDone: () => dispatch({ type: "ALOUD_DONE", now: Date.now(), rng: Math.random }),
-    endSession: () => dispatch({ type: "END_SESSION", now: Date.now() }),
+    endSession: () => dispatch({ type: "END_SESSION" }),
     resetProgress: () => dispatch({ type: "HYDRATE", save: reset(verses) }),
   };
 }

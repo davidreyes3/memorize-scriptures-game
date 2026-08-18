@@ -67,7 +67,7 @@ export type SessionAction =
   | { type: "ANSWER"; ok: boolean; now: number; rng: () => number }
   | { type: "LOOKUP"; now: number; rng: () => number }
   | { type: "ALOUD_DONE"; now: number; rng: () => number }
-  | { type: "END_SESSION"; now: number }
+  | { type: "END_SESSION" }
   | { type: "BACK_TO_PATHS" }
   | { type: "HYDRATE"; save: SaveData };
 
@@ -142,13 +142,20 @@ export function reduce(state: SessionState, action: SessionAction): SessionState
       return completeCurrentItem(state, "aloud-done", action.now, action.rng);
     }
 
+    // A voluntary early quit, not a completed session — no summary (there may be nothing
+    // to summarize) and no progress beyond whatever individual ANSWER/LOOKUP/ALOUD_DONE
+    // actions already recorded before this. Goes straight back to the path's own trail,
+    // not the top-level path list, since that's where the user actually was.
     case "END_SESSION":
       return {
         ...state,
-        screen: "zusammenfassung",
+        screen: "pfad",
         current: null,
         queue: [],
-        summary: summarize(state.attempts, state.save, state.verses, state.startedAt, action.now),
+        startedAt: null,
+        overrunExtraServed: false,
+        attempts: [],
+        summary: null,
       };
 
     case "HYDRATE":

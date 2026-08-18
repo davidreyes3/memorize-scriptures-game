@@ -295,12 +295,30 @@ describe("justGraduated", () => {
 });
 
 describe("END_SESSION", () => {
-  it("jumps to the summary screen, discarding the in-progress item", () => {
+  it("goes straight back to the path's own trail, not a summary screen", () => {
     const state = startedAlphaSession();
-    const result = reduce(state, { type: "END_SESSION", now: NOW + 1000 });
+    const result = reduce(state, { type: "END_SESSION" });
 
-    expect(result.screen).toBe("zusammenfassung");
+    expect(result.screen).toBe("pfad");
+    expect(result.pathId).toBe("alpha");
     expect(result.current).toBeNull();
-    expect(result.summary).toEqual({ answered: 0, firstTimeCorrect: 0, rungsClimbed: 0, held: 0, timeMs: 1000 });
+    expect(result.queue).toEqual([]);
+    expect(result.summary).toBeNull();
+  });
+
+  it("discards attempts made earlier in the quit session, awarding no extra progress", () => {
+    const state = startedAlphaSession();
+    const id = state.current!.id;
+    const answered = reduce(state, { type: "ANSWER", ok: true, now: NOW + 500, rng: rng("x") });
+    expect(answered.attempts).toHaveLength(1);
+
+    const result = reduce(answered, { type: "END_SESSION" });
+
+    expect(result.screen).toBe("pfad");
+    expect(result.attempts).toEqual([]);
+    // The stage change from the ANSWER above is real srs progress, already persisted to
+    // save.progress — END_SESSION doesn't (and shouldn't) roll that back. It only clears
+    // the session's own transient bookkeeping (attempts/queue/current), not earned stage.
+    expect(result.save.progress[id].stage).toBeGreaterThan(1);
   });
 });
