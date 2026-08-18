@@ -4,7 +4,7 @@
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
 Last updated: 2026-08-18 (v1, then four rounds of user-feedback fixes). Pushed through `e6182a7`;
-twenty-three more commits sit on top locally, not yet pushed (`33c5c18`..`2da2ea0`).
+twenty-four more commits sit on top locally, not yet pushed (`33c5c18`..`c6581d9`).
 
 ---
 
