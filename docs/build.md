@@ -325,20 +325,29 @@ For each **introduced** verse in the path:
 
 | Kind | Condition |
 |---|---|
-| `text` | `due <= now` |
-| `ref` | `due <= now` **and** `stage >= 2` — rides the text review; no schedule of its own |
+| `text` | `!isHeld(p)` **or** `due <= now` — see deviation below |
+| `ref` | same as `text` **and** `stage >= 2` — rides the text review; no schedule of its own |
 | `aloud` | `stage >= 3` **and** `now - lastAloud > ALOUD_GAP_MS` |
 
 Shuffle the result. `aloud` is **not a test** — it shows the verse, asks the user to say it, resets
 the timer on "Gesagt", and grades nothing. It never gates progression (§10.4). `ref` **is** graded
 (right/wrong feeds the verdict block) but never gates progression either — see §4.5.
 
+> ⚠️ **Deviation from an earlier pass.** `text`/`ref` used to be gated on `due <= now` regardless of
+> `stage`, so `gradeText`'s interval bump (up to `INTERVALS[stage]` days, even mid-climb) could block
+> the one verse a path's sequential unlocking (§4.9) leaves you anything to do on. Cut: `due` now
+> only gates a verse once it's **held** (`stage === 5`) — spaced review of something already
+> mastered, which is what the interval table is actually for. A verse still being learned is always
+> due. This is what "the stone I'm working on" being freely repeatable (the user's framing) turned
+> out to mean structurally — not a force flag, a narrower due-gate.
+
 > ⚠️ **Deviation from an earlier pass.** `assembleQueue`'s `force` parameter used to back a
 > **"Trotzdem üben"** UI escape hatch that assembled a queue ignoring due dates when nothing was
 > due. The button is gone (§6, §7.3's Pfad description) — with introduction sequential (§4.9) there's
 > always at most one active stone to tap, and forcing practice ahead of the algorithm's own schedule
 > wasn't something the user wanted. `force` itself stays on `assembleQueue`, unused by the UI, since
-> it's cheap to keep and nothing currently calls it with `true`.
+> it's cheap to keep and nothing currently calls it with `true` — it still has a real job for a
+> **held** verse (review it ahead of its own due date), which the due-gate change above doesn't touch.
 
 ### 4.11 Session clock
 
@@ -620,9 +629,10 @@ no-op once every verse in the library is introduced.
 three words even when they are long compounds; a short verse shows in full with no ellipsis;
 the full/first-letter split follows the rung fractions.
 
-**`assembleQueue`** — excludes verses with `introducedAt === null`; `ref` only alongside a due text
-item and only at `stage >= 2`; `aloud` only at `stage >= 3` and after 7 days; a verse can yield up
-to three items at once; the force flag ignores due dates.
+**`assembleQueue`** — excludes verses with `introducedAt === null`; a verse below `stage 5` is
+always due regardless of its `due` date; a held verse is excluded until its `due` date passes; `ref`
+only alongside a due text item and only at `stage >= 2`; `aloud` only at `stage >= 3` and after 7
+days; a verse can yield up to three items at once; the force flag ignores a held verse's due date.
 
 **`parseRef`** — `1. Mose 1,1`, `Johannes 3,16`, `1. Korinther 15,52`; throws on `Genesis 1:1`
 (colon), on missing verse, and on empty input. `formatRef(parseRef(x)) === x` for all book names.

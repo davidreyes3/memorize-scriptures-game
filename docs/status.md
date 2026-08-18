@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (v1, then three rounds of user-feedback fixes). Pushed through `e6182a7`;
-twenty more commits sit on top locally, not yet pushed (`33c5c18`..`265558d`).
+Last updated: 2026-08-18 (v1, then four rounds of user-feedback fixes). Pushed through `e6182a7`;
+twenty-three more commits sit on top locally, not yet pushed (`33c5c18`..`2da2ea0`).
 
 ---
 
@@ -39,7 +39,7 @@ injected, importing nothing from React:
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**146 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
+**147 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
 the stepping stone, and the session controller. `npm run build` type-checks clean (`@types/node`
 added as a dev dependency to fix `licensing.test.ts`'s use of `node:fs`/`node:path`, which `tsc`
 couldn't resolve without it).
@@ -129,6 +129,13 @@ here; every screen is presentation over what `session/controller.ts` and `game/`
   bumped to 3, no migration needed — see `storage/`'s existing "unknown version degrades to
   defaults" rule), and `introduceNewVerses` just introduces every currently-eligible candidate on
   every call. `PfadeScreen`'s stepper and `capReached` messaging are gone with it.
+- **`due` only gates a verse once it's held** (`srs/queue.ts`). It used to gate `text`/`ref`
+  regardless of `stage`, so `gradeText`'s interval bump (up to 21 days, even mid-climb) could stall
+  the one verse a path leaves you anything to do on, once sequential unlocking meant there's nothing
+  else in that path to fall back to. The user's framing was "let me keep going with the stone I'm
+  working on" — not a force flag, but a narrower due-gate: `!isHeld(p) || p.due <= now`. A verse
+  below stage 5 is now always due; a held verse still respects its review schedule exactly as
+  before, matching "it comes up to practice again according to the algorithm" from an earlier round.
 - **`Trotzdem üben` is gone.** With unlocking sequential, the held verses in a path always form a
   prefix, so there's always at most one "active" stone — that stone is now the tap target itself
   (`PfadScreen`, pulses gently via `trail-stone-active`), starting a session with no way to force
