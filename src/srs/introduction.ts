@@ -1,7 +1,13 @@
 // New-verse introduction cap (docs/build.md §4.9) — resolves spec.md §10.2. Nothing in the
 // prototype does this; every verse there starts `due: 0` and all arrive at once, which
 // guarantees an ever-growing queue as the library grows.
-import { DAY_MS, blankProgress, type SaveData, type Verse } from "../game/types";
+//
+// Verses unlock one at a time within a path, stepping-stone style: a verse only becomes
+// introducible once the one immediately before it in its path is held. This is a gate on
+// introduction only — once introduced, a verse stays introduced even if it's later
+// reviewed and drops back out of "held", same as the daily cap never un-introduces.
+import { DAY_MS, blankProgress, type PathId, type SaveData, type Verse } from "../game/types";
+import { isHeld } from "./queue";
 
 const PRUNE_AFTER_DAYS = 30;
 
@@ -31,8 +37,28 @@ export function introduceNewVerses(save: SaveData, verses: readonly Verse[], now
   }
 
   const progress = { ...save.progress };
-  const uninitialized = verses.filter((v) => (progress[v.id] ?? blankProgress()).introducedAt == null);
-  const toIntroduce = uninitialized.slice(0, allowed);
+
+  const byPath = new Map<PathId, Verse[]>();
+  for (const v of verses) {
+    const list = byPath.get(v.path);
+    if (list) list.push(v);
+    else byPath.set(v.path, [v]);
+  }
+
+  // At most one candidate per path: its first not-yet-introduced verse, and only if
+  // that verse's immediate predecessor in the path (if any) is held.
+  const candidates: Verse[] = [];
+  for (const pathVerses of byPath.values()) {
+    for (let i = 0; i < pathVerses.length; i++) {
+      const p = progress[pathVerses[i].id] ?? blankProgress();
+      if (p.introducedAt !== null) continue;
+      const prev = i > 0 ? (progress[pathVerses[i - 1].id] ?? blankProgress()) : null;
+      if (!prev || isHeld(prev)) candidates.push(pathVerses[i]);
+      break;
+    }
+  }
+
+  const toIntroduce = candidates.slice(0, allowed);
 
   for (const verse of toIntroduce) {
     const existing = progress[verse.id] ?? blankProgress();

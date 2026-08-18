@@ -43,9 +43,11 @@ describe("START_SESSION", () => {
     expect(state.startedAt).toBe(NOW);
     expect(state.current).not.toBeNull();
     expect(["f1", "f2", "f3"]).toContain(state.current!.id);
-    // newPerDay defaults to 2 — exactly 2 of alpha's 3 verses got introduced.
+    // Verses unlock one at a time per path (srs/introduction.ts) — f2/f3 need their
+    // predecessor held first, so only f1 is introducible here regardless of newPerDay.
     const introducedCount = ["f1", "f2", "f3"].filter((id) => state.save.progress[id].introducedAt !== null).length;
-    expect(introducedCount).toBe(2);
+    expect(introducedCount).toBe(1);
+    expect(state.save.progress.f1.introducedAt).toBe(NOW);
   });
 
   it("stays put and only persists introductions when nothing ends up due", () => {
