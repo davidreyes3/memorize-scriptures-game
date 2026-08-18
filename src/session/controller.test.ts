@@ -229,7 +229,7 @@ describe("summary", () => {
     const result = reduce(state, { type: "ANSWER", ok: true, now: NOW + 1000, rng: rng("x") });
 
     expect(result.screen).toBe("zusammenfassung");
-    expect(result.summary).toEqual({ answered: 1, firstTimeCorrect: 1, rungsClimbed: 1, held: 1 });
+    expect(result.summary).toEqual({ answered: 1, firstTimeCorrect: 1, rungsClimbed: 1, held: 1, timeMs: 1000 });
   });
 });
 
@@ -240,6 +240,6 @@ describe("END_SESSION", () => {
 
     expect(result.screen).toBe("zusammenfassung");
     expect(result.current).toBeNull();
-    expect(result.summary).toEqual({ answered: 0, firstTimeCorrect: 0, rungsClimbed: 0, held: 0 });
+    expect(result.summary).toEqual({ answered: 0, firstTimeCorrect: 0, rungsClimbed: 0, held: 0, timeMs: 1000 });
   });
 });

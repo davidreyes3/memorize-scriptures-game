@@ -38,6 +38,7 @@ export interface SessionSummary {
   firstTimeCorrect: number;
   rungsClimbed: number;
   held: number;
+  timeMs: number;
 }
 
 export interface SessionState {
@@ -60,7 +61,9 @@ export type SessionAction =
   | { type: "LOOKUP"; now: number; rng: () => number }
   | { type: "ALOUD_DONE"; now: number; rng: () => number }
   | { type: "END_SESSION"; now: number }
-  | { type: "BACK_TO_PATHS" };
+  | { type: "BACK_TO_PATHS" }
+  | { type: "SET_NEW_PER_DAY"; value: number }
+  | { type: "HYDRATE"; save: SaveData };
 
 export function createInitialState(save: SaveData, verses: readonly Verse[]): SessionState {
   return {
@@ -137,8 +140,14 @@ export function reduce(state: SessionState, action: SessionAction): SessionState
         screen: "zusammenfassung",
         current: null,
         queue: [],
-        summary: summarize(state.attempts, state.save, state.verses),
+        summary: summarize(state.attempts, state.save, state.verses, state.startedAt, action.now),
       };
+
+    case "SET_NEW_PER_DAY":
+      return { ...state, save: { ...state.save, settings: { ...state.save.settings, newPerDay: Math.max(0, action.value) } } };
+
+    case "HYDRATE":
+      return createInitialState(action.save, state.verses);
 
     default:
       return state;
@@ -203,7 +212,7 @@ function completeCurrentItem(state: SessionState, outcome: Outcome, now: number,
       current: null,
       screen: "zusammenfassung",
       attempts,
-      summary: summarize(attempts, save, state.verses),
+      summary: summarize(attempts, save, state.verses, state.startedAt, now),
     };
   }
 
@@ -218,7 +227,13 @@ function completeCurrentItem(state: SessionState, outcome: Outcome, now: number,
   };
 }
 
-function summarize(attempts: readonly Attempt[], save: SaveData, verses: readonly Verse[]): SessionSummary {
+function summarize(
+  attempts: readonly Attempt[],
+  save: SaveData,
+  verses: readonly Verse[],
+  startedAt: number | null,
+  now: number,
+): SessionSummary {
   const seenText = new Set<VerseId>();
   let firstTimeCorrect = 0;
   let rungsClimbed = 0;
@@ -235,6 +250,7 @@ function summarize(attempts: readonly Attempt[], save: SaveData, verses: readonl
   }
 
   const held = verses.filter((v) => isHeld(save.progress[v.id] ?? blankProgress())).length;
+  const timeMs = startedAt !== null ? Math.max(0, now - startedAt) : 0;
 
-  return { answered: attempts.length, firstTimeCorrect, rungsClimbed, held };
+  return { answered: attempts.length, firstTimeCorrect, rungsClimbed, held, timeMs };
 }
