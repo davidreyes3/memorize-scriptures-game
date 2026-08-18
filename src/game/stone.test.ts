@@ -11,12 +11,12 @@ describe("stoneState", () => {
     }
   });
 
-  it("is cracked with healed = stage once introduced, for stage 1-4", () => {
+  it("is cracked with healed = stage - 1 once introduced, for stage 1-4", () => {
     const cases: [TextRung, number][] = [
-      [1, 1],
-      [2, 2],
-      [3, 3],
-      [4, 4],
+      [1, 0],
+      [2, 1],
+      [3, 2],
+      [4, 3],
     ];
     for (const [stage, healed] of cases) {
       const progress = { ...blankProgress(), stage, introducedAt: 1000 };
