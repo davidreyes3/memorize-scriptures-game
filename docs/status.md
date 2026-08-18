@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (stepping-stone component landed). Pushed through `e6182a7`; five more
-commits sit on top locally, not yet pushed (`33c5c18`..`f18581f`).
+Last updated: 2026-08-18 (session controller landed). Pushed through `e6182a7`; nine more commits
+sit on top locally, not yet pushed (`33c5c18`..`335256f`).
 
 ---
 
@@ -39,9 +39,10 @@ injected, importing nothing from React:
 | `storage/index.ts` | `load`, `persist`, `reset` — the only module touching `localStorage` |
 | `data/licensing.ts` | `screenForCopyrightedText`, `hasPreReformOrthography` — automated copyright screen |
 
-**127 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen.
-`npm run build` type-checks clean (`@types/node` added as a dev dependency to fix `licensing.test.ts`'s
-use of `node:fs`/`node:path`, which `tsc` couldn't resolve without it).
+**147 tests passing**, covering every case enumerated in `build.md` §9 plus the licensing screen,
+the stepping stone, and the session controller. `npm run build` type-checks clean (`@types/node`
+added as a dev dependency to fix `licensing.test.ts`'s use of `node:fs`/`node:path`, which `tsc`
+couldn't resolve without it).
 
 **The address track lost its ladder** (`e6182a7`, following the docs commit `45f89be`). Gating the
 stone's gold graduation on a second `refStage`/`refDue` ladder meant a forgotten book name could
@@ -73,6 +74,28 @@ Structure section for why the split lands there. A temporary gallery lives in `A
 (`StoneGallery`) showing every state plus a "watch it climb" button — scaffolding, remove once the
 real Pfad trail exists.
 
+**The session controller** (`build.md` §4.9–4.11, §6) — `src/session/controller.ts`'s pure
+`reduce(state, action)` (test-first, 16 cases in `controller.test.ts`) plus the thin
+`src/session/useSession.ts` React hook. Wires `introduceNewVerses` → `assembleQueue` →
+`gradeText`/`markAloud`/`markLookedUpText` into the four-screen state machine
+(Pfade → Pfad → Sitzung → Zusammenfassung). Two things worth knowing before touching it:
+
+- **The invisible clock never ticks.** `isOverrun` is checked only at the moment an item
+  finishes — there's no live countdown state to maintain. "Serve exactly one more, then stop" is a
+  single `overrunExtraServed` flag: once set, the *next* item completion ends the session
+  unconditionally, regardless of what's still queued.
+- **A missed text/ref item and a Nachschlagen both requeue onto the session's own `queue` array**,
+  separate from the `due`-date persistence `gradeText`/`markLookedUpText` already handle — this is
+  what makes a miss "return later in the same session" per the acceptance criteria, on top of (not
+  instead of) returning on a future day.
+
+Session summary stats (`answered`, `firstTimeCorrect`, `rungsClimbed`, `held`) are computed by a
+separate `summarize()` from a plain attempts log at session end, kept apart from the per-action
+transition logic so each stays simple and independently testable. A temporary `SessionDebug` view
+in `App.tsx` drives the whole reducer — pick a path, start a session, grade items, watch the
+summary land — same scaffolding pattern as `StoneGallery`, and the real place `SteppingStone` and
+this controller meet is the Pfad/Sitzung screens, not yet built.
+
 **The visual foundation** (`build.md` §7.1–7.2) — `src/styles/tokens.css` holds the full light/dark
 token table (three-state theming: bare `:root`, `prefers-color-scheme` media guard, `[data-theme]`
 override) plus four `--font-*` variables. The four faces (Bevan, Karla, EB Garamond, IBM Plex Mono)
@@ -92,14 +115,15 @@ known 1984 wordings, so stripping the tags doesn't get past it.
 
 Roughly in dependency order.
 
-1. **The session controller** — the stateful layer wiring pure `game/`/`srs/` functions to React:
-   current screen, active queue, round in progress, the invisible five-minute clock and its
-   "serve exactly one more item, then stop" rule (§4.11). This is the only genuinely new *logic*
-   left; everything else is presentation.
-2. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
-   variants), Zusammenfassung. Sitzung is by far the biggest. Pfad is where `SteppingStone` gets a
-   real home, replacing the temporary `App.tsx` gallery.
-3. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
+1. **The four screens** (`build.md` §6) — Pfade, Pfad (the trail), Sitzung (seven exercise
+   variants), Zusammenfassung. Sitzung is by far the biggest — it needs `buildRound`, `decoysFor`,
+   `skeleton`, and `parseRef`/`formatRef`/`nearNumbers` wired to `useSession`'s current item to
+   actually render the seven exercise bodies, none of which the controller builds itself. Pfad is
+   where `SteppingStone` gets a real home, replacing the temporary `App.tsx` gallery; the debug
+   view's buttons (`Richtig`/`Falsch`/`Nachschlagen`/`Gesagt`/`Beenden`) map directly to
+   `useSession`'s existing `answer`/`lookup`/`aloudDone`/`endSession` actions, so the screens are
+   presentation on top of what's already wired, not new logic.
+2. **`src/i18n/de.ts`** — currently holds only `appName`. Every user-facing string belongs here as
    screens get built, so a second locale stays possible.
 
 ---

@@ -83,15 +83,18 @@ src/
   components/   React only — stepping stone, trail, cloze board, tile bank, session chrome
   game/         tokenizing, round building, decoys, skeleton, reference parsing
   srs/          grading, scheduling, verse introduction, queue assembly
+  session/      the session controller — pure reducer (controller.ts) + its React hook (useSession.ts)
   data/         verses.de.ts, paths.de.ts, books.de.ts
   i18n/         de.ts — every user-facing string, app name included
   storage/      localStorage read/write + schema versioning
 ```
 
-**`game/` and `srs/` import nothing from React and touch no browser globals.** They are pure
-functions over plain data, with `now` and `rng` passed in rather than called inside. This is the
-most important structural rule in the project — it is what makes the logic testable, and
-`build.md` §9 specifies the tests. `storage/` is the only module allowed to touch `localStorage`.
+**`game/`, `srs/`, and `session/controller.ts` import nothing from React and touch no browser
+globals.** They are pure functions over plain data, with `now` and `rng` passed in rather than
+called inside. This is the most important structural rule in the project — it is what makes the
+logic testable, and `build.md` §9 specifies the tests for `game/`/`srs/`. `storage/` is the only
+module allowed to touch `localStorage`; `session/useSession.ts` is the one file allowed to call
+`Date.now()`/`Math.random()` directly, as the thin wiring layer between the pure reducer and React.
 
 `game/stone.ts` is a deliberate, narrow exception: `stoneState(progress)` is presentation-derived
 (it maps `stage`/`introducedAt` to the stepping stone's locked/cracked/held visual, `build.md`
