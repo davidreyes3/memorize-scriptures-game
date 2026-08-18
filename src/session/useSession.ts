@@ -17,7 +17,7 @@ export function useSession(verses: readonly Verse[]) {
     state,
     selectPath: (pathId: PathId) => dispatch({ type: "SELECT_PATH", pathId }),
     backToPaths: () => dispatch({ type: "BACK_TO_PATHS" }),
-    startSession: (force = false) => dispatch({ type: "START_SESSION", now: Date.now(), rng: Math.random, force }),
+    startSession: () => dispatch({ type: "START_SESSION", now: Date.now(), rng: Math.random }),
     answer: (ok: boolean) => dispatch({ type: "ANSWER", ok, now: Date.now(), rng: Math.random }),
     lookup: () => dispatch({ type: "LOOKUP", now: Date.now(), rng: Math.random }),
     aloudDone: () => dispatch({ type: "ALOUD_DONE", now: Date.now(), rng: Math.random }),

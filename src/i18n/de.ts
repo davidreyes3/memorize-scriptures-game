@@ -17,7 +17,6 @@ export const de = {
   allesErledigt: "Alles erledigt",
   capReached:
     "Für heute sind schon alle neuen Verse eingeführt. Erhöhe „Neue Verse pro Tag” auf der Pfade-Übersicht, um mehr freizuschalten.",
-  trotzdemUeben: "Trotzdem üben",
   zurueck: "Zurück",
 
   // Sitzung chrome

@@ -56,7 +56,7 @@ export interface SessionState {
 
 export type SessionAction =
   | { type: "SELECT_PATH"; pathId: PathId }
-  | { type: "START_SESSION"; now: number; rng: () => number; force?: boolean }
+  | { type: "START_SESSION"; now: number; rng: () => number }
   | { type: "ANSWER"; ok: boolean; now: number; rng: () => number }
   | { type: "LOOKUP"; now: number; rng: () => number }
   | { type: "ALOUD_DONE"; now: number; rng: () => number }
@@ -101,7 +101,7 @@ export function reduce(state: SessionState, action: SessionAction): SessionState
     case "START_SESSION": {
       if (!state.pathId) return state;
       const save = introduceNewVerses(state.save, state.verses, action.now);
-      const queue = assembleQueue(state.pathId, save, state.verses, action.now, action.rng, action.force ?? false);
+      const queue = assembleQueue(state.pathId, save, state.verses, action.now, action.rng);
       if (queue.length === 0) return { ...state, save };
 
       const [first, ...rest] = queue;
