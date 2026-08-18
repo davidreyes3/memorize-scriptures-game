@@ -3,8 +3,8 @@
 **Keep this file current.** It's the first thing to read when picking the project up cold, and the
 last thing to update when work lands. `build.md` says what to build; this says how far along it is.
 
-Last updated: 2026-08-18 (v1, then five rounds of user-feedback fixes). Pushed through `1cb5963`;
-two more commits sit on top locally, not yet pushed (`9a4e6fc`..`c1b1575`).
+Last updated: 2026-08-18 (v1, then seven rounds of user-feedback fixes). Pushed through `b43a33a`;
+everything since is local, uncommitted.
 
 ---
 
@@ -17,9 +17,34 @@ reversal), `docs/build.md` (the implementation spec, incl. the finalized visual 
 **Project scaffold** — Vite + React + TypeScript + Vitest. `npm install`, `npm test`,
 `npm run build`, and `npm run dev` all work.
 
-**Content** (`src/data/`) — 17 memorization items across 3 paths, all verified Luther 1912 supplied
-by the user, with source exports archived in `docs/` for provenance. German path names and blurbs
-finalized. German book-name constant complete.
+**Content** (`src/data/`) — 81 memorization items across 10 paths, all verified Luther 1912 supplied
+by the user, with source exports archived in `docs/` for provenance (gitignored — see *Loose ends*
+below). German path names and blurbs finalized. German book-name constant complete.
+
+**Fundament and Was beim Tod geschieht were removed, nine doctrine paths added.** The user supplied
+nine new Logos exports (Engel, Der Himmel, Die Hölle, Der Heilige Geist, Rechtfertigung, Meditation,
+Die Auferstehung, Satan, Der Zehnte) and asked for the two original placeholder paths to be dropped.
+All nine passed the licensing screen before anything was transcribed into `verses.de.ts`. One item
+was deliberately left out: `Doctrine_-_Resurrection.html` listed the entire 58-verse "1. Korinther
+15" as its own entry alongside the already-separate 54–55 excerpt — the user chose to skip the
+whole-chapter entry rather than add it as one oversized memorization item or hand-pick verses from
+it. `BOOKS_DE` gained "Hiob" and "2. Petrus", the two books this content introduced that weren't
+already covered. Every new `ref` was round-trip-checked through `parseRef`/`formatRef` before
+landing (not just the licensing screen) to catch anything the regex-based parser would choke on.
+
+**The doctrine paths' longer verse ranges exposed a real bug in the cloze difficulty ramp.**
+User feedback on `1. Mose 2,2–3` ("this is already too hard") — a stage-2 cloze already blanking
+14 words. `MAX_WINDOW` was a single number (14) shared by every stage; for any verse over ~47
+words, `round(len * FRACTION[stage])` already exceeded 14 by stage 2, so the first cloze was
+capped at the exact same size as the last one — `FRACTION`'s intended ramp (`.3 → .6 → 1 → 1`)
+never actually showed up. Measured against shipped content: 15/78 verses hit the cap by stage 2
+even before this session's new paths; the doctrine paths (several 2–3 verse ranges) made it worse.
+Fixed by making `MAX_WINDOW` a per-stage array, `[0, 0, 6, 9, 12, 14]`, indexed like
+`FRACTION`/`DECOYS` rather than one shared ceiling. `1. Mose 2,2–3` (49 words) now ramps
+`6 → 9 → 12 → 14` across stages 2–5 instead of `14, 14, 14, 14`. Kalt's ceiling (rung 5) stays 14,
+unchanged — that number was chosen for mobile tap-count reasons (§4.6), not this bug. Test-first
+in `round.test.ts`, including a regression test asserting the four stages are strictly increasing
+on a long verse.
 
 **The whole pure-logic layer** — `game/`, `srs/`, `storage/`, all pure functions with `now`/`rng`
 injected, importing nothing from React:
@@ -58,18 +83,28 @@ data yet to lose. Full reasoning: `build.md` §7.3's design-decision callout, an
 (test-first, `stone.test.ts`) plus `src/components/SteppingStone.tsx`/`.css`. Three states off
 `stage`/`introducedAt` alone: locked (dotted outline, `?`), cracked (one element, a
 `conic-gradient` of 5 wedges over a `repeating-conic-gradient` seam layer, `--p1`…`--p5` driven by
-a `healed` count), held (72px solid gold, `✓`). One design correction along the way: `healed` is
-`stage`, not `stage - 1` — the original formula only ever reached 3-of-5 healed at the last cracked
-stage, so reaching held silently healed *two* wedges (4 and 5) in the same instant it turned gold,
-which read as a jump rather than a completion. `healed = stage` reaches 4-of-5, leaving exactly one
-crack for graduation to close.
+a `healed` count), held (72px solid gold, `✓`). `healed = stage - 1`: a wedge only heals once its
+rung has actually been passed, so a freshly introduced verse (`stage: 1`, nothing answered yet)
+shows all 5 wedges still cracked.
+
+This went through two designs. The first cut used `healed = stage - 1` and reached only 3-of-5
+healed at the last cracked stage, so reaching held silently healed *two* wedges (4 and 5) in the
+same instant it turned gold — a visible jump. The fix at the time was `healed = stage`, reaching
+4-of-5 and leaving exactly one crack for graduation to close — but that meant a *brand-new* verse
+(`stage: 1`, introduced the instant you tap its stone, before answering anything) already showed
+one wedge mended. A user who started a session and immediately hit "Beenden" without answering a
+single question would return to the trail to find visible progress they hadn't earned. Once the
+sealing/graduation two-beat animation below existed to bridge the last-wedge-plus-gold transition on
+its own, that workaround wasn't needed to avoid the jump — so `healed` reverted to `stage - 1`, and
+the sealing beat is what now owns the "close the last crack and turn gold" moment exclusively.
 
 Graduation itself is two beats, not one: a transient "sealing" frame — all 5 wedges mended, still
 not gold, with a small breathing pulse (`stone-seal` keyframe) — holds for 600ms before the gold
-cross-fade plays (0.65s, synced with the `stone-graduate` keyframe). This frame has no backing
-`stage` value (there isn't a 6th rung to spare). `stoneState` itself stays a pure 3-state function —
-see `CLAUDE.md`'s Structure section for why the split lands there. Rendered for real on the Pfad
-trail (`PfadScreen.tsx`); the old `App.tsx` gallery is gone.
+cross-fade plays (0.65s, synced with the `stone-graduate` keyframe). This frame forces every wedge
+closed regardless of the cracked-state `healed` value moments before, and has no backing `stage`
+value (there isn't a 6th rung to spare). `stoneState` itself stays a pure 3-state function — see
+`CLAUDE.md`'s Structure section for why the split lands there. Rendered for real on the Pfad trail
+(`PfadScreen.tsx`); the old `App.tsx` gallery is gone.
 
 **The graduation animation didn't actually play, and the fix wasn't a CSS tweak.** User feedback
 ("very abrupt going from gray to gold") turned out to be literally true: `App.tsx` swaps screens
@@ -102,6 +137,15 @@ sessions, confirming via `MutationObserver` that `sealing -> held` now genuinely
   separate from the `due`-date persistence `gradeText`/`markLookedUpText` already handle — this is
   what makes a miss "return later in the same session" per the acceptance criteria, on top of (not
   instead of) returning on a future day.
+- **`END_SESSION` (the Sitzung "Beenden" link) no longer routes through Zusammenfassung.** It used
+  to always jump to the summary screen, same as a naturally completed session — but Beenden is a
+  voluntary early quit, and showing a stats screen (and requiring a "Fertig" tap through it) for a
+  session where the user answered nothing read as being credited for progress that didn't happen.
+  It now goes straight back to `screen: "pfad"`, discarding `queue`/`current`/`attempts`/`summary`
+  without computing one. Progress from any items actually answered *before* the quit is untouched —
+  `ANSWER`/`LOOKUP`/`ALOUD_DONE` already wrote it to `save.progress` by the time Beenden is pressed,
+  and `END_SESSION` only clears the session's own transient bookkeeping, never `save`. The action no
+  longer carries a `now` (nothing left in this branch needs it, now that no summary is computed).
 
 Session summary stats (`answered`, `firstTimeCorrect`, `rungsClimbed`, `held`) are computed by a
 separate `summarize()` from a plain attempts log at session end, kept apart from the per-action

@@ -107,7 +107,7 @@ New verses start `{ stage:1, due:0, seen:0, lastAloud:0, introducedAt:null }`.
 | `FRACTION` | `[0, 0, .3, .6, 1, 1]` | share of the verse hidden, indexed by text rung |
 | `DECOYS` | `[0, 0, 0, 1, 2, 3]` | spare words in the bank, by text rung |
 | `INTERVALS` | `[0, 1, 2, 4, 9, 21]` | days until next review, by rung reached |
-| `MAX_WINDOW` | `14` | most words hidden at once — **now applies at rung 5 too** |
+| `MAX_WINDOW` | `[0, 0, 6, 9, 12, 14]` | most words hidden at once, **by text rung** — not one global cap (§4.6) |
 | `MIN_WINDOW` | `3` | fewest, unless the verse is shorter |
 | `SESSION_MS` | `300_000` | five minutes |
 | `ALOUD_GAP_MS` | `7 * 86_400_000` | how often a held verse is read aloud again |
@@ -165,7 +165,7 @@ interface Round {
 
 ```
 len    = tokens.length
-n      = min(len, MAX_WINDOW, max(MIN_WINDOW, round(len * FRACTION[stage])))
+n      = min(len, MAX_WINDOW[stage], max(MIN_WINDOW, round(len * FRACTION[stage])))
 room   = len - n
 rng    = mulberry32(hashSeed(verse.id, seen))
 start  = room <= 0 ? 0 : floor(rng() * (room + 1))
@@ -179,6 +179,12 @@ bank   = shuffle([...window.map(i => tokens[i]), ...decoysFor(verse, DECOYS[stag
 > A pure fixed stride (`seen*5`) was also rejected: when `room+1` is 5 or 10 the window
 > barely moves — `gcd(5, 10) = 5` gives a two-position cycle. The seeded PRNG is
 > deterministic, testable, and well distributed.
+>
+> ⚠️ **Deviation, found via real content.** `MAX_WINDOW` used to be a single number (14)
+> shared by every stage. Once verses longer than ~47 words existed (the doctrine paths' 2–3
+> verse ranges), `round(len * FRACTION[stage])` already exceeded 14 by stage 2 — the very
+> first cloze was capped at the same size as the last one, and the ramp `FRACTION` was meant
+> to create never showed up. `MAX_WINDOW` is now indexed by stage, like `FRACTION`/`DECOYS`.
 
 **Edge cases:** verses shorter than `MIN_WINDOW` use `n = len`. When `room === 0` the window is
 the whole verse and `start` is 0.
@@ -232,7 +238,7 @@ unchanged, and (for text) `due = 0` so the verse returns the same day. The round
 > ([engrave.html:525](../prototype/engrave.html#L525)), so 1. Korinther 15,52 demands 31 taps —
 > §10.1 flags this as a genuine mobile problem.
 
-*Kalt* now uses the **same windowing as every other rung**, so `MAX_WINDOW` applies:
+*Kalt* now uses the **same windowing as every other rung**, so `MAX_WINDOW[5]` (14) applies:
 
 - Words **outside** the window render in full, in the serif face.
 - Words **inside** the window render as **first letters only**, filling in as they are tapped in order.
@@ -431,7 +437,9 @@ stone's state **is** the progress display.
 
 **Sitzung (session item)** — shared chrome: end-session link, rung segments, reference,
 **Nachschlagen** button, reveal area. No countdown, no draining bar — per §4.11 the timer is fully
-invisible. Seven bodies:
+invisible. The end-session link is a voluntary early quit, not a completed session — it returns
+straight to the path's own Pfad trail, **not** the Zusammenfassung screen (that's reserved for the
+queue actually running dry or the invisible clock's overrun serve, §4.11). Seven bodies:
 
 | Item | Body |
 |---|---|
@@ -572,20 +580,39 @@ vertical space with a plaque.
 
 ## 8. Content
 
-Three paths, **17 memorization items** (some spanning a verse range — §4.8), all populated with
+Ten paths, **81 memorization items** (some spanning a verse range — §4.8), all populated with
 verified Luther 1912 text supplied by the user. `docs/spec.md` §7 originally specified 11
-single-verse items; the Sabbath path was later replaced with a larger range-inclusive set.
+single-verse items; the Sabbath path was later replaced with a larger range-inclusive set. The
+original `foundation` (Fundament) and `death` (Was beim Tod geschieht) placeholder paths were
+later removed once nine doctrine-study paths replaced them.
 
 | Path id | Name | Items |
 |---|---|---|
-| `foundation` | Fundament | 1. Mose 1,1 · Johannes 1,1 · Römer 6,23 · 2. Timotheus 3,16 |
 | `sabbath` | Der Sabbat | 1. Mose 2,2–3 · 2. Mose 20,8–11 · 2. Mose 31,16–17 · 3. Mose 23,3 · Jesaja 58,13–14 · Jesaja 66,23 · Markus 2,27–28 · Lukas 4,16 · Hebräer 4,9 · 5. Mose 5,12–13 |
-| `death` | Was beim Tod geschieht | Prediger 9,5 · Prediger 12,7 · 1. Korinther 15,52 |
+| `angels` | Engel | Hiob 38,7 · Psalm 34,7 · Jesaja 6,2 · Hesekiel 1,6 · Lukas 20,35–36 · Hebräer 13,2 · Psalm 99,1 · Offenbarung 5,11 |
+| `heaven` | Der Himmel | 5. Mose 26,15 · Matthäus 5,12 · Johannes 3,13 · Apostelgeschichte 2,34–35 · 2. Korinther 12,2 · Psalm 103,19 · Offenbarung 5,10 |
+| `hell` | Die Hölle | Matthäus 5,22 · Matthäus 10,28 · Markus 9,43 · Matthäus 16,18 · 1. Korinther 15,54–55 · Offenbarung 20,13 · Psalm 16,10 · 2. Petrus 2,4 |
+| `holy-spirit` | Der Heilige Geist | Johannes 4,24 · Johannes 14,17 · Apostelgeschichte 5,32 · Römer 8,9 · Römer 8,14 · Römer 8,16 · Galater 5,22–23 · Epheser 4,30 · 1. Korinther 2,10 · 2. Korinther 4,16 |
+| `justification` | Rechtfertigung | Jakobus 2,24 · Römer 2,13 · Römer 3,20 · Römer 3,28 · Römer 3,24 · Römer 8,30 · Galater 2,16 · Titus 3,7 |
+| `meditation` | Meditation | Josua 1,8 · Psalm 1,2 · Psalm 5,1 · Psalm 19,14 · Psalm 119,97 · Philipper 4,8 |
+| `resurrection` | Die Auferstehung | Hiob 14,13–15 · Daniel 12,2 · Matthäus 22,30 · Matthäus 22,31–32 · Johannes 5,28–29 · Johannes 11,25 · Apostelgeschichte 24,15 · 1. Thessalonicher 4,16 · Offenbarung 20,4 |
+| `satan` | Satan | Jesaja 14,12 · Hesekiel 28,15–16 · Johannes 8,44 · 2. Korinther 4,3–4 · 2. Korinther 11,13–15 · Epheser 2,1–2 · 1. Petrus 5,8 · Jakobus 4,7–8 |
+| `tithes` | Der Zehnte | 5. Mose 16,16 · Maleachi 3,8 · Matthäus 23,23 · 2. Korinther 9,6–7 · 5. Mose 14,22 · 5. Mose 14,26 · 5. Mose 14,28 |
+
+`Doctrine_-_Resurrection.html`'s source export also listed the entire 58-verse "1. Korinther 15" as
+its own entry, on top of the 54–55 excerpt above — left out deliberately (user's call) rather than
+added as one oversized item or trimmed to a hand-picked subset.
 
 **Verse text is never written from memory, generated, or paraphrased** — not even as a placeholder
-to be fixed later. Source exports are archived under `docs/` for provenance
-(`source-luther1912.html`, plus the Sabbath replacement's source) with a comment in
-`verses.de.ts` pointing at them.
+to be fixed later. Source exports are archived under `docs/` for provenance (`luther1912.html`, the
+Sabbath replacement's source, and one `luther1912-<topic>.html` per doctrine path) with a comment in
+`verses.de.ts` pointing at them. These are **committed**, not gitignored — unlike a raw Logos export,
+which stays local-only under the `docs/source-*.html` gitignore rule until cleaned: hyperlinks (the
+`ref.ly` links and the `;lu1912`/`;lutbib1984` resource tags they carried) and every mention of
+"Logos" are stripped out first, leaving plain reference/text markup with no export-tool branding and
+a `<!-- Luther 1912 (public domain) -->` comment in place of the tag-based provenance evidence.
+Screened automatically by `licensing.test.ts` — the committed files unconditionally, any leftover
+local raw export only if present.
 
 **Two doctrine paths were supplied and rejected: Baptism and Salvation.** Both exports were Luther
 **1984**, not 1912 — confirmed from the Logos export markup itself, which tags each inline verse
