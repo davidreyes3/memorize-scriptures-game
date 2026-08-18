@@ -115,8 +115,9 @@ describe("shipped verse data is public domain", () => {
   });
 });
 
-// Logos exports are gitignored but live in docs/ locally. Screening them here means dropping
-// a copyrighted export into the project fails `npm test` before its text can be ingested.
+// Raw Logos exports are gitignored but live in docs/ locally before cleanup (see CLAUDE.md
+// under "Scripture licensing and git history"). Screening them here means dropping a
+// copyrighted export into the project fails `npm test` before its text can be ingested.
 // Skipped rather than failed when absent, since CI and fresh clones won't have them.
 describe("local source exports (if present)", () => {
   const docsDir = join(process.cwd(), "docs");
@@ -130,6 +131,24 @@ describe("local source exports (if present)", () => {
   }
 
   it.each(exports)("%s is a public-domain export", (file) => {
+    const raw = readFileSync(join(docsDir, file), "utf8");
+    const findings = screenForCopyrightedText(raw);
+    expect(findings, `${file} → ${findings.map((f) => `${f.rule} (${f.detail})`).join("; ")}`).toEqual([]);
+  });
+});
+
+// The `luther1912*.html` files ARE committed (hyperlinks and Logos branding stripped out —
+// see docs/build.md §8), unlike the raw `source-*.html` exports above. They're always
+// present, so this runs unconditionally rather than skipping when absent.
+describe("committed luther1912*.html documentation copies", () => {
+  const docsDir = join(process.cwd(), "docs");
+  const files = readdirSync(docsDir).filter((f) => f.startsWith("luther1912") && f.endsWith(".html"));
+
+  it("has at least one file to screen", () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it.each(files)("%s is a public-domain export", (file) => {
     const raw = readFileSync(join(docsDir, file), "utf8");
     const findings = screenForCopyrightedText(raw);
     expect(findings, `${file} → ${findings.map((f) => `${f.rule} (${f.detail})`).join("; ")}`).toEqual([]);
