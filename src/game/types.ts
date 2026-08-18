@@ -75,3 +75,4 @@ export const SCHEMA_VERSION = 2;
 export const TEXT_RUNG_NAMES = ["Lesen", "Satzteil", "Abschnitt", "Aufbau", "Kalt"] as const;
 // Not rungs — three forms of one ungated address question, picked at random (build.md §4.10).
 export const ADDRESS_QUESTION_FORMS = ["Erkennen", "Zuordnen", "Bilden"] as const;
+export type AddressQuestionForm = (typeof ADDRESS_QUESTION_FORMS)[number];
