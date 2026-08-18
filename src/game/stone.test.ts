@@ -21,7 +21,7 @@ describe("stoneState", () => {
     for (const [stage, healed] of cases) {
       const progress = { ...blankProgress(), stage, introducedAt: 1000 };
       const result = stoneState(progress);
-      expect(result.state).toBe("cracked");
+      if (result.state !== "cracked") throw new Error("expected cracked");
       expect(result.healed).toBe(healed);
     }
   });

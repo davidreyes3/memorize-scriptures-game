@@ -1,0 +1,92 @@
+/* docs/build.md §7.3 — one element, three states, driven by stage alone. */
+
+.stone {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 61% 39% 52% 48% / 46% 40% 60% 54%;
+  background: var(--waymark);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition:
+    width 0.4s ease,
+    height 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+/* The cracked wedge pattern lives on ::before, not the base element, so it can
+   cross-fade to 0 opacity on graduation — background-image itself can't transition. */
+.stone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  background:
+    repeating-conic-gradient(from 0deg, var(--surface-line) 0deg 1deg, transparent 1deg 72deg),
+    conic-gradient(
+      var(--p1) 0deg 72deg,
+      var(--p2) 72deg 144deg,
+      var(--p3) 144deg 216deg,
+      var(--p4) 216deg 288deg,
+      var(--p5) 288deg 360deg
+    );
+}
+
+.stone[data-state="locked"] {
+  background: none;
+  border: 2px dotted var(--stone-line);
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.stone[data-state="locked"]::before {
+  content: none;
+}
+
+.stone[data-state="held"] {
+  width: 72px;
+  height: 72px;
+  animation: stone-graduate 0.6s ease;
+}
+
+.stone[data-state="held"]::before {
+  opacity: 0;
+}
+
+.stone-mark {
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--ink-muted);
+}
+
+.stone[data-state="held"] .stone-mark {
+  color: var(--on-waymark);
+}
+
+@keyframes stone-graduate {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 var(--waymark);
+  }
+  55% {
+    transform: scale(1.08);
+    box-shadow: 0 0 16px 4px var(--waymark);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stone,
+  .stone::before {
+    transition: none;
+    animation: none;
+  }
+}
